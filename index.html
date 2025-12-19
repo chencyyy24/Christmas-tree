@@ -1,0 +1,3100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D心跳可视化 - 冬宫版</title>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cinzel:wght@700&family=Ma+Shan+Zheng&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        button,
+        input,
+        label,
+        select,
+        textarea,
+        .control-panel h3,
+        .control-panel h4 {
+            font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #title-layer {
+            position: absolute;
+            top: 8%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+            transition: top 0.5s ease;
+        }
+
+        #title-layer.heart-mode {
+            top: 5%;
+        }
+
+        h1 {
+            margin: 0;
+            font-family: 'Great Vibes', cursive;
+            font-size: 6.5rem;
+            background: linear-gradient(to bottom, #FFFFFF, #FFD700, #DAA520);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.5));
+            opacity: 0;
+            animation: fadeIn 3s ease-out forwards 0.5s;
+            transition: all 0.5s ease;
+        }
+
+        h1.heart-mode {
+            background: linear-gradient(to bottom, #FFB6C1, #FF69B4, #FF1493);
+            -webkit-background-clip: text;
+            filter: drop-shadow(0 0 30px rgba(255, 105, 180, 0.7));
+        }
+
+        /* Clean Lyrics Styles */
+        #lyrics-container {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            z-index: 20;
+            pointer-events: none;
+            padding-bottom: 20px;
+        }
+
+        .lyric-line {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+
+        .lyric-line.active {
+            opacity: 1;
+        }
+
+        /* English Text Styling */
+        .lyric-line .original {
+            display: block;
+            font-family: 'Great Vibes', cursive;
+            font-size: 5.25rem;
+            line-height: 1.1;
+            white-space: pre-wrap;
+            letter-spacing: 2px;
+            color: #FFFFFF;
+            text-align: center;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.8),
+                0 0 30px rgba(255, 215, 0, 0.5),
+                0 0 50px rgba(255, 215, 0, 0.3);
+        }
+
+        /* Translation Subtitle Style */
+        .lyric-translation {
+            display: block;
+            font-family: "Ma Shan Zheng", cursive;
+            font-size: 3.0rem;
+            font-weight: normal;
+            color: #FFFFFF;
+            text-align: center;
+            margin-top: 5px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.8),
+                0 0 30px rgba(255, 215, 0, 0.5),
+                0 0 50px rgba(255, 215, 0, 0.3);
+        }
+
+        /* --- UPDATED: Heart Mode Lyrics (White Core + Gold Halo) --- */
+        .lyric-line.heart-mode .original,
+        .lyric-line.heart-mode .lyric-translation {
+            /* Pure White Core */
+            color: #FFFFFF;
+            /* Soft Champagne Gold Halo - High End Look */
+            text-shadow:
+                0 0 10px rgba(255, 215, 0, 0.6),
+                0 0 20px rgba(218, 165, 32, 0.5),
+                0 0 30px rgba(255, 215, 0, 0.4);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #cam-preview {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 180px;
+            height: 135px;
+            z-index: 20;
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.2);
+            opacity: 0;
+            transition: opacity 1s, border-color 0.3s, box-shadow 0.3s;
+        }
+
+        #cam-preview.heart-mode {
+            border-color: #FF69B4;
+            box-shadow: 0 0 25px rgba(255, 105, 180, 0.4);
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        /* Common Button Styles */
+        .sidebar-btn {
+            position: absolute;
+            left: 30px;
+            z-index: 30;
+            background: transparent;
+            border: 1px solid #FFD700;
+            color: #FFD700;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s;
+            font-size: 0.95rem;
+            backdrop-filter: blur(5px);
+            width: 220px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-btn:hover {
+            background: rgba(255, 215, 0, 0.3);
+            color: #FFD700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+        }
+
+        .sidebar-btn.heart-mode {
+            border-color: #FF69B4;
+            color: #FF69B4;
+        }
+
+        .sidebar-btn.heart-mode:hover {
+            background: rgba(255, 105, 180, 0.3);
+            color: #FFB6C1;
+            box-shadow: 0 0 20px rgba(255, 105, 180, 0.5);
+            text-shadow: 0 0 8px rgba(255, 105, 180, 0.8);
+        }
+
+        #music-toggle-btn {
+            top: 30px;
+        }
+
+        #light-toggle-btn {
+            top: 80px;
+        }
+
+        #visual-toggle-btn {
+            top: 130px;
+        }
+
+        #heart-brightness-btn {
+            top: 180px;
+        }
+
+        .control-panel {
+            position: absolute;
+            left: 280px;
+            z-index: 15;
+            background: rgba(5, 5, 5, 0.95);
+            padding: 15px;
+            border-left: 3px solid #FFD700;
+            backdrop-filter: blur(15px);
+            min-width: 280px;
+            max-height: 70vh;
+            overflow-y: auto;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: translateX(-20px);
+            pointer-events: none;
+            display: none;
+        }
+
+        .control-panel.show {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+            display: block;
+        }
+
+        .control-panel.heart-mode {
+            border-left-color: #FF69B4;
+        }
+
+        #audio-panel {
+            top: 30px;
+        }
+
+        #light-panel {
+            top: 80px;
+        }
+
+        #visual-panel {
+            top: 130px;
+        }
+
+        .control-panel h3,
+        .control-panel h4 {
+            margin: 0 0 10px 0;
+            color: #FFD700;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-panel.heart-mode h3,
+        .control-panel.heart-mode h4 {
+            color: #FF69B4;
+        }
+
+        #fullscreen-btn {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            z-index: 30;
+            background: transparent;
+            border: 1px solid #FFD700;
+            color: #FFD700;
+            padding: 10px 25px;
+            cursor: pointer;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: 0.3s;
+            font-size: 0.9rem;
+            backdrop-filter: blur(5px);
+        }
+
+        #fullscreen-btn:hover {
+            background: rgba(255, 215, 0, 0.3);
+            color: #FFD700;
+            box-shadow: 0 0 20px #FFD700;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+        }
+
+        #ui-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 10;
+            color: #D4AF37;
+            background: rgba(5, 5, 5, 0.85);
+            padding: 15px;
+            border-left: 3px solid #FFD700;
+            backdrop-filter: blur(15px);
+            min-width: 220px;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            transition: border-color 0.3s;
+        }
+
+        #ui-panel.heart-mode {
+            border-left-color: #FF69B4;
+            color: #FFB6C1;
+        }
+
+        .status-row {
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .icon {
+            width: 25px;
+            text-align: center;
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+
+        .highlight {
+            color: #FFF;
+            font-weight: bold;
+            text-shadow: 0 0 12px #FFD700;
+            transition: text-shadow 0.3s;
+        }
+
+        .highlight.heart-mode {
+            text-shadow: 0 0 12px #FF69B4;
+        }
+
+        .sub-text {
+            font-size: 0.8rem;
+            color: #999;
+            margin-left: 33px;
+            display: block;
+            line-height: 1.2;
+            margin-bottom: 5px;
+        }
+
+        .audio-control-group {
+            margin-bottom: 10px;
+        }
+
+        .audio-control-group label {
+            display: block;
+            color: #D4AF37;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .control-panel.heart-mode label {
+            color: #FFB6C1;
+        }
+
+        .source-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .source-btn {
+            padding: 8px;
+            background: rgba(255, 215, 0, 0.15);
+            border: 2px solid #FFD700;
+            color: #FFD700;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            transition: all 0.3s;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .source-btn:hover {
+            background: rgba(255, 215, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .source-btn.active {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .control-panel.heart-mode .source-btn {
+            background: rgba(255, 105, 180, 0.15);
+            border-color: #FF69B4;
+            color: #FF69B4;
+        }
+
+        .control-panel.heart-mode .source-btn:hover {
+            background: rgba(255, 105, 180, 0.3);
+        }
+
+        .control-panel.heart-mode .source-btn.active {
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: #FFF;
+            box-shadow: 0 0 20px rgba(255, 105, 180, 0.6);
+        }
+
+        .photo-upload-btn,
+        .translate-btn {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px dashed #FFD700;
+            color: #FFD700;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            transition: all 0.3s;
+            font-size: 0.85rem;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .photo-upload-btn:hover {
+            background: rgba(255, 215, 0, 0.2);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .control-panel.heart-mode .photo-upload-btn {
+            border-color: #FF69B4;
+            color: #FF69B4;
+        }
+
+        .control-panel.heart-mode .photo-upload-btn:hover {
+            background: rgba(255, 105, 180, 0.2);
+            box-shadow: 0 0 10px rgba(255, 105, 180, 0.3);
+        }
+
+        .split-btn-group {
+            display: flex;
+            align-items: stretch;
+            margin-bottom: 8px;
+            width: 100%;
+            height: 38px;
+        }
+
+        .split-btn-main {
+            flex: 9;
+            background: linear-gradient(135deg, #FFD700, #DAA520);
+            color: #000;
+            text-align: center;
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            transition: all 0.3s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 10px;
+        }
+
+        .split-btn-main.secondary {
+            background: linear-gradient(135deg, #333, #555);
+            color: #FFD700;
+            border: 1px solid #FFD700;
+            border-right: none;
+        }
+
+        .split-btn-clear {
+            flex: 1;
+            background: #8B0000;
+            color: #FFF;
+            border: 1px solid #FFD700;
+            border-left: 1px solid rgba(0, 0, 0, 0.3);
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 1rem;
+            min-width: 35px;
+        }
+
+        .split-btn-main:hover {
+            filter: brightness(1.1);
+        }
+
+        .split-btn-clear:hover {
+            background: #FF0000;
+        }
+
+        .control-panel.heart-mode .split-btn-main:not(.secondary) {
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: #FFF;
+        }
+
+        .control-panel.heart-mode .split-btn-main.secondary {
+            color: #FFB6C1;
+            border-color: #FF69B4;
+            background: linear-gradient(135deg, #333, #555);
+        }
+
+        .control-panel.heart-mode .split-btn-clear {
+            border-color: #FF69B4;
+            background: #8B008B;
+        }
+
+        .control-panel.heart-mode .split-btn-clear:hover {
+            background: #FF1493;
+        }
+
+        #audio-file-input,
+        #photo-file-input,
+        #lrc-en-input,
+        #lrc-cn-input {
+            display: none;
+        }
+
+        #audio-filename,
+        #lrc-en-filename,
+        #lrc-cn-filename {
+            color: #FFF;
+            font-size: 0.75rem;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 8px;
+            opacity: 0.8;
+            height: 16px;
+        }
+
+        #audio-controls {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .control-btn {
+            flex: 1;
+            padding: 5px;
+            background: rgba(255, 215, 0, 0.2);
+            border: 1px solid #FFD700;
+            color: #FFD700;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            transition: all 0.3s;
+            font-size: 0.85rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 215, 0, 0.4);
+        }
+
+        .control-panel.heart-mode .control-btn {
+            background: rgba(255, 105, 180, 0.2);
+            border-color: #FF69B4;
+            color: #FF69B4;
+        }
+
+        .control-panel.heart-mode .control-btn:hover {
+            background: rgba(255, 105, 180, 0.4);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .audio-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: #333;
+            outline: none;
+        }
+
+        .audio-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .control-panel.heart-mode .audio-slider::-webkit-slider-thumb {
+            background: #FF69B4;
+        }
+
+        .slider-value {
+            color: #FFF;
+            font-size: 0.85rem;
+            text-align: right;
+            margin-top: 3px;
+        }
+
+        #audio-visualizer {
+            width: 100%;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .freq-bar {
+            position: absolute;
+            bottom: 0;
+            width: 8px;
+            background: linear-gradient(to top, #FFD700, #FFA500);
+            transition: height 0.05s;
+            border-radius: 3px 3px 0 0;
+        }
+
+        .control-panel.heart-mode .freq-bar {
+            background: linear-gradient(to top, #FF69B4, #FF1493);
+        }
+
+        #audio-status {
+            color: #999;
+            font-size: 0.8rem;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        #volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #volume-control span {
+            color: #FFD700;
+            font-size: 1.0rem;
+        }
+
+        .control-panel.heart-mode #volume-control span {
+            color: #FF69B4;
+        }
+
+        .info-box {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #CCC;
+            line-height: 1.3;
+        }
+
+        .control-panel.heart-mode .info-box {
+            background: rgba(255, 105, 180, 0.1);
+            border-color: rgba(255, 105, 180, 0.3);
+        }
+
+        .info-box strong {
+            color: #FFD700;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .control-panel.heart-mode .info-box strong {
+            color: #FF69B4;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #FFD700;
+            transition: opacity 0.8s;
+        }
+
+        /* --- STEP 1: OFFLINE MODE OVERLAY (Launch Config) --- */
+        #offline-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 5, 0.98);
+            z-index: 300;
+            display: none;
+            /* Hidden by default, shown by JS logic */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(20px);
+        }
+
+        .folder-btn-container {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        #folder-select-btn {
+            padding: 25px 60px;
+            border: 3px solid #FFD700;
+            color: #FFD700;
+            font-size: 1.5rem;
+            background: rgba(0, 0, 0, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-family: "PingFang SC", sans-serif;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #folder-select-btn:hover {
+            background: #FFD700;
+            color: #000;
+            box-shadow: 0 0 80px rgba(255, 215, 0, 0.6);
+            transform: scale(1.05);
+        }
+
+        #folder-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* --- STEP 2: INSTRUCTIONS OVERLAY (Detailed Gameplay Guide) --- */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            backdrop-filter: blur(15px);
+            overflow-y: auto;
+            /* Allow scrolling */
+            padding: 40px 0;
+        }
+
+        #start-overlay::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #start-overlay::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        #start-btn-large {
+            padding: 20px 50px;
+            border: 2px solid #FFD700;
+            color: #FFD700;
+            font-size: 2rem;
+            background: transparent;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            font-family: 'Great Vibes', cursive;
+            border-radius: 50px;
+            transition: all 0.4s;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+            margin: 40px 0 20px 0;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        #start-btn-large:hover {
+            background: #FFD700;
+            color: #000;
+            box-shadow: 0 0 60px rgba(255, 215, 0, 0.8);
+            transform: scale(1.1);
+        }
+
+        /* New Guide Grid System */
+        .guide-section {
+            margin-bottom: 25px;
+            text-align: center;
+            max-width: 900px;
+            width: 90%;
+        }
+
+        .guide-subtitle {
+            color: #FFD700;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 8px;
+            display: inline-block;
+            font-family: "PingFang SC", sans-serif;
+        }
+
+        .guide-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            max-width: 1000px;
+            width: 95%;
+            margin-bottom: 30px;
+        }
+
+        .guide-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px 10px;
+            text-align: center;
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .guide-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 215, 0, 0.1);
+            border-color: #FFD700;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .guide-card .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            width: auto;
+        }
+
+        .guide-card h4 {
+            color: #FFD700;
+            margin: 5px 0 10px 0;
+            font-size: 1.1rem;
+        }
+
+        .guide-card p {
+            color: #CCC;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .guide-list {
+            text-align: left;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px dashed rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px 40px;
+            display: inline-block;
+        }
+
+        .guide-list li {
+            color: #CCC;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .guide-list strong {
+            color: #FFF;
+            margin-right: 5px;
+        }
+
+        /* --- STEP 3: FINAL HINT OVERLAY (Pre-flight Check) --- */
+        #final-hint-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 210;
+            /* Higher than start-overlay */
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            backdrop-filter: blur(20px);
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        #final-hint-overlay.active {
+            opacity: 1;
+        }
+
+        .hint-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .hint-text {
+            font-size: 1.5rem;
+            color: #FFD700;
+            margin-bottom: 10px;
+            font-family: "PingFang SC", sans-serif;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .hint-sub {
+            font-size: 1rem;
+            color: #CCC;
+            margin-bottom: 40px;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #333;
+            border-top: 4px solid #FFD700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #photo-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: zoom-out;
+        }
+
+        #photo-modal.active {
+            opacity: 1;
+            visibility: visible;
+            background: rgba(0, 0, 0, 0.92);
+        }
+
+        .modal-content {
+            position: relative;
+            max-width: 85%;
+            max-height: 85%;
+            background: linear-gradient(135deg, #c19a6b 0%, #b08958 15%, #c19a6b 30%, #9e7848 50%, #c19a6b 70%, #b08958 85%, #c19a6b 100%);
+            padding: 18px;
+            border-radius: 2px;
+            box-shadow: inset 0 2px 8px rgba(255, 240, 200, 0.1), inset 0 -2px 8px rgba(50, 30, 10, 0.3), 2px 2px 4px rgba(90, 60, 30, 0.2), 0 0 60px rgba(139, 69, 19, 0.4), 0 0 100px rgba(255, 215, 0, 0.15);
+            transform: scale(0.3) rotateX(20deg);
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+            opacity: 0;
+        }
+
+        #photo-modal.active .modal-content {
+            transform: scale(1) rotateX(0deg);
+            opacity: 1;
+        }
+
+        .modal-inner-frame {
+            background: linear-gradient(135deg, #7a5c38, #5a4028);
+            padding: 3px;
+            border-radius: 1px;
+            box-shadow: inset 0 0 3px rgba(50, 30, 10, 0.3);
+        }
+
+        .modal-matte {
+            background: #f5f0e8;
+            padding: 15px;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.08);
+        }
+
+        .modal-img {
+            display: block;
+            max-width: 70vw;
+            max-height: 60vh;
+            object-fit: contain;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .wood-grain-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(90deg, transparent 0px, transparent 8px, rgba(176, 137, 88, 0.15) 8px, rgba(176, 137, 88, 0.15) 10px, transparent 10px, transparent 15px);
+            pointer-events: none;
+            border-radius: 2px;
+        }
+
+        .modal-glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 240, 200, 0.05);
+            pointer-events: none;
+            border-radius: 2px;
+        }
+
+        .modal-hint {
+            position: absolute;
+            bottom: -50px;
+            width: 100%;
+            text-align: center;
+            color: #FFD700;
+            font-size: 1rem;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease 0.3s;
+        }
+
+        #photo-modal.active .modal-hint {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #photo-count-display {
+            color: #888;
+            font-size: 0.8rem;
+            text-align: center;
+            margin-top: 5px;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm"
+            }
+        }
+    </script>
+
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loading = document.getElementById('loading');
+                if (loading) {
+                    loading.style.opacity = 0;
+                    setTimeout(() => {
+                        if (loading) loading.remove();
+                        const camPreview = document.getElementById('cam-preview');
+                        if (camPreview) camPreview.style.opacity = 1;
+                    }, 1000);
+                    console.warn("Watchdog: Forced loading screen removal.");
+                }
+            }, 5000);
+        });
+    </script>
+    <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="font-size: 1.8rem; letter-spacing: 6px;">WINTER PALACE</div>
+        <div style="font-size: 0.9rem; opacity: 0.6; margin-top: 10px;">正在初始化摄像头与3D引擎...</div>
+    </div>
+
+    <!-- STEP 1: LAUNCH CONFIGURATION OVERLAY -->
+    <div id="offline-overlay">
+        <h1 style="font-size: 3rem; margin-bottom: 10px; color: #FFF; text-shadow: 0 0 20px #FFD700;">✨ 启动配置 ✨</h1>
+        <p style="color: #CCC; margin-bottom: 40px; font-size: 1.1rem; text-align: center; line-height: 1.5;">
+            为了加载您的本地资源 (images, music, lyrics)，<br>请点击下方按钮，选择包含本网页的文件夹(就是那个"圣诞快乐"文件夹哦~~)。
+        </p>
+
+        <div class="folder-btn-container">
+            <div id="folder-select-btn">
+                <span>📂</span>
+                <span>选择启动文件夹 (Unlock)</span>
+            </div>
+            <!-- Directory input to allow selecting the root folder -->
+            <input type="file" id="folder-input" webkitdirectory directory multiple>
+        </div>
+
+        <div style="margin-top: 20px; color: #666; font-size: 0.8rem;">
+            * 此操作仅用于读取并自动加载您的本地文件，不会上传至任何服务器
+        </div>
+    </div>
+
+    <!-- STEP 2: GAMEPLAY INSTRUCTIONS OVERLAY (DETAILED) -->
+    <div id="start-overlay">
+        <h2 style="font-size: 2.5rem; color: #FFD700; margin-bottom: 20px; font-family: 'Great Vibes', cursive;">✨
+            沉浸式互动指南 ✨</h2>
+
+        <div id="status-message" style="color: #4CAF50; margin-bottom: 20px; font-size: 0.9rem; min-height: 20px;">
+        </div>
+
+        <!-- Section 1: Camera Tracking -->
+        <div class="guide-section">
+            <h3 class="guide-subtitle">🎥 智能体感视角</h3>
+            <p style="color: #DDD; font-size: 1rem; line-height: 1.6;">
+                摄像头不仅会识别您的手势，还会实时追踪您的手部位置！<br>
+                试着在摄像头前<b>上下左右移动您的手掌</b>，3D场景的视角将跟随您的手部律动而旋转，<br>
+                仿佛您正亲自在冬宫中漫步，指尖掌控全场。
+            </p>
+        </div>
+
+        <!-- Section 2: Gestures -->
+        <div class="guide-section">
+            <h3 class="guide-subtitle">🖐 手势魔法指令</h3>
+            <div class="guide-grid">
+                <!-- Tree -->
+                <div class="guide-card">
+                    <div class="icon">✊</div>
+                    <h4>召唤圣诞树</h4>
+                    <p>对着镜头<b>握紧拳头</b><br>万千粒子将迅速响应，聚合成璀璨的金色圣诞树。</p>
+                </div>
+                <!-- Heart -->
+                <div class="guide-card">
+                    <div class="icon">🤏</div>
+                    <h4>浪漫爱心</h4>
+                    <p><b>拇指与食指捏合</b><br>粒子重组为粉色爱心，自带金芯金晕的梦幻光效。</p>
+                </div>
+                <!-- Tree Scatter -->
+                <div class="guide-card">
+                    <div class="icon">✊ ⮕ 🖐</div>
+                    <h4>圣诞树爆发</h4>
+                    <p>从<b>握拳</b>变为<b>张开手掌</b><br>圣诞树将瞬间华丽炸裂，照片如雪花般悬浮散落。</p>
+                </div>
+                <!-- Heart Scatter -->
+                <div class="guide-card">
+                    <div class="icon">🤏 ⮕ 🖐</div>
+                    <h4>爱心雨</h4>
+                    <p>从<b>捏合</b>变为<b>张开手掌</b><br>粉色爱心化作漫天粒子雨，浪漫氛围拉满。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Mouse & Interaction -->
+        <div class="guide-section">
+            <h3 class="guide-subtitle">🖱️ 鼠标与照片互动</h3>
+            <div class="guide-list">
+                <ul>
+                    <li><strong>点击照片墙：</strong> 圣诞树上挂着您的回忆照片，点击任意相框即可放大查看高清大图。</li>
+                    <li><strong>捕捉悬浮照：</strong> 在“爆发散开”模式下，照片会悬浮在空中，同样可以点击捕捉它们。</li>
+                    <li><strong>鼠标视角：</strong> 按住鼠标左键拖拽可360度旋转场景；滚动滚轮可拉近或推远镜头。</li>
+                    <li><strong>控制面板：</strong> 鼠标移至屏幕左侧边缘，可展开音乐、灯光、视觉控制面板。</li>
+                </ul>
+            </div>
+        </div>
+
+        <button id="start-btn-large">下一步 (Next)</button>
+
+        <div style="color: #666; font-size: 0.8rem; margin-top: 10px;">
+            请确保摄像头权限开启以体验完整功能
+        </div>
+    </div>
+
+    <!-- STEP 3: FINAL HINT OVERLAY -->
+    <div id="final-hint-overlay">
+        <div class="hint-icon">🎧</div>
+        <div class="hint-text">请佩戴耳机以获得最佳体验</div>
+        <div class="hint-sub">音乐与视觉的完美同步需要沉浸式音频环境</div>
+
+        <div class="hint-icon" style="margin-top: 30px;">↗️</div>
+        <div class="hint-text">点击右上角进入全屏模式</div>
+        <div class="hint-sub">视野更开阔，体验更震撼</div>
+
+        <button id="start-btn-large" class="final-start-btn" style="margin-top: 40px;">开始体验！(Start)</button>
+    </div>
+
+    <div id="photo-modal">
+        <div class="modal-content">
+            <div class="wood-grain-overlay"></div>
+            <div class="modal-glow"></div>
+            <div class="modal-inner-frame">
+                <div class="modal-matte">
+                    <img src="" class="modal-img" id="modal-image-display">
+                </div>
+            </div>
+            <div class="modal-hint">✨ 点击任意处关闭 ✨</div>
+        </div>
+    </div>
+
+    <div id="title-layer">
+        <h1 id="main-title">Merry Christmas!</h1>
+    </div>
+
+    <div id="lyrics-container">
+        <div id="lyric-text" class="lyric-line">
+            <span class="original"></span>
+            <span class="translation lyric-translation"></span>
+        </div>
+    </div>
+
+    <div id="cam-preview">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+
+    <button id="music-toggle-btn" class="sidebar-btn"><span>🎵 音乐图片设置</span> <span>▼</span></button>
+    <button id="light-toggle-btn" class="sidebar-btn"><span>💡 灯光设置</span> <span>▼</span></button>
+    <button id="visual-toggle-btn" class="sidebar-btn"><span>👁️ 视觉设置</span> <span>▼</span></button>
+    <button id="heart-brightness-btn" class="sidebar-btn"><span>✨ 爱心亮度：正常</span></button>
+
+    <button id="fullscreen-btn">全屏模式</button>
+
+    <div id="audio-panel" class="control-panel">
+        <h3>🎵 音频设置</h3>
+
+        <div class="audio-control-group">
+            <label>音频来源</label>
+            <div class="source-buttons">
+                <button class="source-btn" id="mic-source-btn">
+                    🎤 麦克风<br>
+                    <span style="font-size: 0.7rem; opacity: 0.8;">(系统收音)</span>
+                </button>
+                <button class="source-btn" id="file-source-btn">
+                    📁 本地文件<br>
+                    <span style="font-size: 0.7rem; opacity: 0.8;">(上传/默认)</span>
+                </button>
+            </div>
+        </div>
+
+        <input type="file" id="photo-file-input" accept="image/*" multiple>
+        <button class="photo-upload-btn" onclick="document.getElementById('photo-file-input').click()">
+            📷 上传圣诞树照片 (追加)
+        </button>
+        <div id="photo-count-display">暂无照片</div>
+
+        <div id="file-upload-section" style="display:none;">
+            <input type="file" id="audio-file-input" accept="audio/*">
+            <div class="split-btn-group">
+                <label for="audio-file-input" class="split-btn-main" id="audio-file-label">
+                    📁 上传音乐文件
+                </label>
+                <button class="split-btn-clear" id="audio-file-clear" title="清除上传">✕</button>
+            </div>
+            <div id="audio-filename"></div>
+
+            <input type="file" id="lrc-en-input" accept=".lrc,text/plain">
+            <div class="split-btn-group">
+                <label for="lrc-en-input" class="split-btn-main secondary" id="lrc-en-label">
+                    📁 上传原首歌词 (英文)
+                </label>
+                <button class="split-btn-clear" id="lrc-en-clear" title="清除上传">✕</button>
+            </div>
+            <div id="lrc-en-filename"></div>
+
+            <input type="file" id="lrc-cn-input" accept=".lrc,text/plain">
+            <div class="split-btn-group">
+                <label for="lrc-cn-input" class="split-btn-main secondary" id="lrc-cn-label">
+                    📁 上传翻译歌词 (中文)
+                </label>
+                <button class="split-btn-clear" id="lrc-cn-clear" title="清除上传">✕</button>
+            </div>
+            <div id="lrc-cn-filename"></div>
+
+            <div id="audio-controls">
+                <button class="control-btn" id="play-btn" disabled>▶️</button>
+                <button class="control-btn" id="pause-btn" disabled>⏸️</button>
+                <button class="control-btn" id="stop-btn" disabled>⏹️</button>
+            </div>
+        </div>
+
+        <div class="audio-control-group" style="margin-top: 15px;">
+            <label>音量</label>
+            <div id="volume-control">
+                <span>🔊</span>
+                <input type="range" id="volume-slider" class="audio-slider" min="0" max="100" step="1" value="100">
+                <span class="slider-value" id="volume-value">100%</span>
+            </div>
+        </div>
+
+        <div class="audio-control-group">
+            <label>灵敏度</label>
+            <input type="range" id="sensitivity-slider" class="audio-slider" min="1" max="5" step="0.1" value="3">
+            <div class="slider-value" id="sensitivity-value">3.0x</div>
+        </div>
+
+        <div class="audio-control-group">
+            <label>心跳强度</label>
+            <input type="range" id="intensity-slider" class="audio-slider" min="0" max="100" step="5" value="100">
+            <div class="slider-value" id="intensity-value">100%</div>
+        </div>
+
+        <div class="audio-control-group">
+            <label>音频频谱</label>
+            <div id="audio-visualizer"></div>
+        </div>
+
+        <div id="audio-status">请选择音频来源以开始</div>
+
+        <div class="info-box">
+            <strong>💡 如何使用系统音频：</strong>
+            1. 安装 VB-Audio Cable (Windows) 或 BlackHole (Mac)<br>
+            2. 设为默认输出设备<br>
+            3. 点击上方“麦克风”按钮<br>
+            4. 粒子将随系统音频律动！
+        </div>
+    </div>
+
+    <!-- LIGHT PANEL -->
+    <div id="light-panel" class="control-panel">
+        <h3>💡 灯光设置</h3>
+        <div class="audio-control-group">
+            <label>光照角度 (水平)</label>
+            <input type="range" id="light-angle-h-slider" class="audio-slider" min="0" max="360" step="5" value="0">
+            <div class="slider-value" id="light-angle-h-value">0°</div>
+        </div>
+        <div class="audio-control-group">
+            <label>光照角度 (垂直)</label>
+            <input type="range" id="light-angle-v-slider" class="audio-slider" min="10" max="90" step="5" value="45">
+            <div class="slider-value" id="light-angle-v-value">45°</div>
+        </div>
+        <div class="audio-control-group">
+            <label>光照强度</label>
+            <input type="range" id="light-intensity-slider" class="audio-slider" min="0" max="200" step="10" value="50">
+            <div class="slider-value" id="light-intensity-value">50%</div>
+        </div>
+    </div>
+
+    <!-- VISUAL PANEL -->
+    <div id="visual-panel" class="control-panel">
+        <h3>👁️ 视觉设置</h3>
+        <div class="audio-control-group">
+            <label>相机距离</label>
+            <input type="range" id="camera-dist-slider" class="audio-slider" min="30" max="150" step="1" value="75">
+            <div class="slider-value" id="camera-dist-value">75</div>
+        </div>
+        <div class="audio-control-group">
+            <label>自动旋转速度</label>
+            <input type="range" id="auto-rotate-slider" class="audio-slider" min="0" max="20" step="0.5" value="0.5">
+            <div class="slider-value" id="auto-rotate-value">0.5</div>
+        </div>
+        <div class="info-box">
+            <strong>👁️ 操作说明</strong>
+            • 拖动滑块缩放<br>
+            • 增加数值旋转<br>
+            • 手势将接管旋转控制，但保持缩放距离。
+        </div>
+    </div>
+
+    <div id="ui-panel">
+        <div class="status-row">当前手势：<span id="gesture-text" class="highlight" style="margin-left: 10px">初始化中...</span>
+        </div>
+        <div style="border-top: 1px solid #444; margin: 15px 0;"></div>
+        <div class="status-row"><span class="icon">🖐</span> <span>张开手掌：散开</span></div>
+        <span class="sub-text">粒子爆发效果</span>
+        <div class="status-row" style="margin-top:15px;"><span class="icon">✊</span> <span>握紧拳头：聚合</span>
+        </div>
+        <span class="sub-text">组成圣诞树</span>
+        <div class="status-row" style="margin-top:15px;"><span class="icon">🤏</span> <span>拇指食指捏合：爱心</span>
+        </div>
+        <span class="sub-text">组成粉色爱心</span>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+        // --- SECTION: USER CONFIGURATION (EDIT HERE) ---
+        // 1. 手动填写文件夹中的图片文件名
+        // 2. 手动填写音乐路径
+        // 3. 将LRC歌词内容直接粘贴到下方引号中
+
+        const DEFAULT_CONFIG = {
+            images: [],
+            music: null,
+            lyricsEn: null,
+            lyricsCn: null
+        };
+        // ------------------------------------------------
+
+        const video = document.getElementById('webcam');
+        const camPreview = document.getElementById('cam-preview');
+        const gestureText = document.getElementById('gesture-text');
+
+        // Overlays
+        const offlineOverlay = document.getElementById('offline-overlay');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn-large'); // Guide Next Btn
+        const finalHintOverlay = document.getElementById('final-hint-overlay');
+        const finalStartBtn = finalHintOverlay.querySelector('.final-start-btn'); // Real Start Btn
+
+        const folderInput = document.getElementById('folder-input');
+        const statusMessage = document.getElementById('status-message');
+
+        let handData = { x: 0.5, y: 0.5, isActive: false };
+        let viewState = 'TREE_SHAPE';
+        let lastGatheredShape = 'TREE';
+        const gestureHistory = [];
+        const GESTURE_HISTORY_SIZE = 5;
+
+        async function initAI() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = stream;
+                    video.addEventListener('loadeddata', async () => {
+                        try {
+                            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+                            const handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
+                                runningMode: "VIDEO", numHands: 1
+                            });
+
+                            let lastTime = -1;
+                            function predict() {
+                                if (video.currentTime !== lastTime) {
+                                    const results = handLandmarker.detectForVideo(video, Date.now());
+                                    if (results.landmarks && results.landmarks.length > 0) {
+                                        const landmarks = results.landmarks[0];
+                                        handData.isActive = true;
+                                        handData.x = 1 - landmarks[9].x;
+                                        handData.y = landmarks[9].y;
+                                        const { gesture, label } = detectGesture(landmarks);
+                                        const stableGesture = getStableGesture(gesture);
+                                        if (stableGesture === 'TREE_SHAPE') lastGatheredShape = 'TREE';
+                                        else if (stableGesture === 'HEART_SHAPE') lastGatheredShape = 'HEART';
+                                        viewState = stableGesture;
+                                        gestureText.innerText = label;
+                                        gestureText.style.color = stableGesture === 'HEART_SHAPE' ? "#FF69B4" : "#FFD700";
+                                    } else {
+                                        handData.isActive = false;
+                                        gestureText.innerText = "扫描中...";
+                                        gestureText.style.color = "#666";
+                                    }
+                                    lastTime = video.currentTime;
+                                }
+                                requestAnimationFrame(predict);
+                            }
+                            predict();
+
+                            const loading = document.getElementById('loading');
+                            if (loading) loading.remove();
+                            camPreview.style.opacity = 1;
+
+                            // Check if server resources are available immediately
+                            initServerResources();
+
+                        } catch (e) {
+                            console.warn("AI Model load failed (network?)", e);
+                        }
+                    });
+                } catch (err) {
+                    console.warn("Camera permission denied", err);
+                }
+            }
+        }
+        initAI();
+
+        const TOTAL_PARTICLES = 20000;
+        const MAX_PHOTOS = 60;
+
+        const CONFIG = {
+            counts: {
+                lights: Math.ceil(TOTAL_PARTICLES * 0.001),
+                balls: Math.floor(TOTAL_PARTICLES * 0.035),
+                gifts: Math.floor(TOTAL_PARTICLES * 0.04),
+                canes: Math.floor(TOTAL_PARTICLES * 0.03),
+                socks: Math.floor(TOTAL_PARTICLES * 0.02),
+                hats: Math.floor(TOTAL_PARTICLES * 0.03),
+                needles: Math.floor(TOTAL_PARTICLES * 0.77),
+                snow: 2500,
+                groundGifts: 80,
+                groundCanes: 40,
+                groundSocks: 30,
+                groundBalls: 30
+            },
+            physics: { needle: 0.15, gift: 0.02, ball: 0.05, light: 0.09, common: 0.04, frame: 0.04 },
+            colors: {
+                needle: 0x004225, gold: 0xFFD700, red: 0x8B0000,
+                palette: [0xFFD700, 0xCC0000, 0x0022AA, 0xC0C0C0, 0x800080],
+                heartPalette: [0xFF69B4, 0xFFB6C1, 0xFF1493, 0xDB7093, 0xFFC0CB]
+            },
+            tree: { height: 26, radius: 11 },
+            heart: { scale: 1.5 }
+        };
+
+        let uploadedImages = [];
+        let defaultImages = [];
+        let activePhotoCount = 0;
+
+        let uploadedAudioURL = null;
+        let defaultAudioURL = null;
+
+        let uploadedLrcEnContent = null;
+        let defaultLrcEnContent = null;
+
+        let uploadedLrcCnContent = null;
+        let defaultLrcCnContent = null;
+
+        let lightSettings = { angleH: 0, angleV: 45, intensity: 0.5, baseIntensity: 3600 };
+        let cameraSettings = { distance: 75, autoRotateSpeed: 0.5 };
+
+        let lyricsDataEn = [];
+        let lyricsDataCn = [];
+        let currentEnIndex = -1;
+        const lyricElement = document.getElementById('lyric-text');
+        const lyricsContainer = document.getElementById('lyrics-container');
+
+        const mainTitle = document.getElementById('main-title');
+        const uiPanel = document.getElementById('ui-panel');
+        const photoCountDisplay = document.getElementById('photo-count-display');
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function distance2D(p1, p2) { return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)); }
+        function distance3D(p1, p2) { return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2) + Math.pow((p1.z || 0) - (p2.z || 0), 2)); }
+
+        function detectGesture(landmarks) {
+            const wrist = landmarks[0], thumbTip = landmarks[4], indexTip = landmarks[8], indexPip = landmarks[6], indexMcp = landmarks[5];
+            const middleTip = landmarks[12], middlePip = landmarks[10], middleMcp = landmarks[9];
+            const ringTip = landmarks[16], ringPip = landmarks[14], pinkyTip = landmarks[20], pinkyPip = landmarks[18];
+            const palmSize = distance2D(wrist, middleMcp);
+            const pinchDist = distance3D(thumbTip, indexTip);
+            const normalizedPinch = pinchDist / palmSize;
+            const indexExtended = distance2D(indexTip, wrist) > distance2D(indexPip, wrist) * 1.1;
+            const middleExtended = distance2D(middleTip, wrist) > distance2D(middlePip, wrist) * 1.1;
+            const ringExtended = distance2D(ringTip, wrist) > distance2D(ringPip, wrist) * 1.1;
+            const pinkyExtended = distance2D(pinkyTip, wrist) > distance2D(pinkyPip, wrist) * 1.1;
+            const extendedCount = [indexExtended, middleExtended, ringExtended, pinkyExtended].filter(Boolean).length;
+            const thumbExtended = distance2D(thumbTip, indexMcp) > palmSize * 0.5;
+            if (normalizedPinch < 0.35 && middleExtended) return { gesture: 'HEART_SHAPE', label: '捏合 🤏' };
+            if (extendedCount >= 3) return { gesture: 'SCATTERED', label: '张开 🖐' };
+            if (extendedCount <= 1 || (!indexExtended && !thumbExtended)) return { gesture: 'TREE_SHAPE', label: '握拳 ✊' };
+            return { gesture: 'SCATTERED', label: '张开 🖐' };
+        }
+
+        function getStableGesture(newGesture) {
+            gestureHistory.push(newGesture);
+            if (gestureHistory.length > GESTURE_HISTORY_SIZE) gestureHistory.shift();
+            const counts = {};
+            gestureHistory.forEach(g => { counts[g] = (counts[g] || 0) + 1; });
+            let maxCount = 0, stableGesture = newGesture;
+            for (const [gesture, count] of Object.entries(counts)) {
+                if (count > maxCount) { maxCount = count; stableGesture = gesture; }
+            }
+            return maxCount >= Math.ceil(GESTURE_HISTORY_SIZE / 2) ? stableGesture : viewState;
+        }
+
+        function getHeartPosition(index, total) {
+            const scale = CONFIG.heart.scale;
+            const angle = (index / total) * Math.PI * 2;
+            const fillRandom = Math.pow(Math.random(), 0.5);
+            const x = 16 * Math.pow(Math.sin(angle), 3);
+            const y = 13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle);
+            return new THREE.Vector3((x + (Math.random() - 0.5) * 8 * fillRandom) * scale, (y + (Math.random() - 0.5) * 8 * fillRandom) * scale + 5, (Math.random() - 0.5) * 4 * scale);
+        }
+
+        function getHeartScatterPosition(index, total) {
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+            const angle = index * goldenAngle;
+            const radius = 8 + (index / total) * 12;
+            return new THREE.Vector3(Math.cos(angle) * radius, 5 + Math.sin(angle * 0.5) * 8, Math.sin(angle) * radius * 0.6);
+        }
+
+        function createSmallHeartGeo() {
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0.5);
+            shape.bezierCurveTo(-0.8, 1.4, -2.0, 0.2, 0, -1.0);
+            shape.bezierCurveTo(2.0, 0.2, 0.8, 1.4, 0, 0.5);
+            const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.3, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1, bevelSegments: 3 });
+            geo.scale(0.35, 0.35, 0.35);
+            geo.rotateX(-Math.PI / 2);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 6, 75);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enablePan = false;
+        controls.enableZoom = true;
+        controls.minDistance = 30;
+        controls.maxDistance = 150;
+        controls.target.set(0, 6, 0);
+
+        const headLight = new THREE.SpotLight(0xFFF8E7, 1800);
+        headLight.angle = 0.6; headLight.penumbra = 0.5; headLight.decay = 1.5; headLight.distance = 200;
+        camera.add(headLight); scene.add(camera);
+
+        const rimLight = new THREE.PointLight(0x445588, 250); rimLight.position.set(0, 20, -40); scene.add(rimLight);
+        const heartLight = new THREE.PointLight(0xFF69B4, 0); heartLight.position.set(0, 10, 30); scene.add(heartLight);
+        const mainLight = new THREE.DirectionalLight(0xFFFFFF, 1); mainLight.position.set(50, 50, 50); scene.add(mainLight);
+
+        function createGiftTexture(baseColor) {
+            const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = baseColor; ctx.fillRect(0, 0, 128, 128);
+            ctx.fillStyle = '#FFD700'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 6;
+            ctx.fillRect(48, 0, 32, 128); ctx.fillRect(0, 48, 128, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // GENERATE ONLY WOOD TEXTURE (NO IMAGE) TO PREVENT CANVAS TAINTING
+        function createWoodenFrameTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 320;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#c19a6b'; ctx.fillRect(0, 0, 256, 320);
+            ctx.fillStyle = 'rgba(176, 137, 88, 0.4)';
+            for (let i = 0; i < 40; i++) { ctx.fillRect(Math.random() * 256, 0, 1 + Math.random() * 2, 320); }
+            ctx.fillStyle = 'rgba(158, 120, 72, 0.3)';
+            for (let i = 0; i < 25; i++) { ctx.fillRect(Math.random() * 256, 0, 1 + Math.random() * 2, 320); }
+            ctx.fillStyle = 'rgba(255, 240, 200, 0.1)'; ctx.fillRect(0, 0, 256, 320);
+            ctx.strokeStyle = '#7a5c38'; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, 255, 319);
+            ctx.fillStyle = 'rgba(50, 30, 10, 0.3)'; ctx.fillRect(15, 15, 226, 290);
+            ctx.strokeStyle = '#f5f0e8'; ctx.lineWidth = 1; ctx.strokeRect(18, 18, 220, 284);
+            ctx.fillStyle = '#f5f0e8'; ctx.fillRect(21, 21, 214, 278);
+
+            // Draw dark placeholder background
+            ctx.fillStyle = '#2a1d10';
+            ctx.fillRect(28, 28, 200, 264);
+
+            const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function createCandyTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 64, 64);
+            ctx.fillStyle = '#CC0000';
+            for (let i = -64; i < 128; i += 16) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 12, 0); ctx.lineTo(i - 4, 64); ctx.lineTo(i - 16, 64); ctx.fill(); }
+            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        function createCandyGeo() {
+            const path = new THREE.CatmullRomCurve3([new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.2, 0), new THREE.Vector3(0.15, 0.5, 0), new THREE.Vector3(0.35, 0.35, 0), new THREE.Vector3(0.35, 0.2, 0)]);
+            return new THREE.TubeGeometry(path, 12, 0.07, 8, false);
+        }
+
+        function createSockGeo() {
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0); shape.lineTo(0.3, 0); shape.lineTo(0.3, -0.6);
+            shape.quadraticCurveTo(0.3, -0.9, 0.1, -0.9); shape.lineTo(-0.1, -0.9);
+            shape.quadraticCurveTo(-0.3, -0.9, -0.3, -0.7); shape.quadraticCurveTo(-0.3, -0.5, -0.1, -0.5); shape.lineTo(0, -0.4);
+            return new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.03, bevelSegments: 2 });
+        }
+
+        function createHatGeo() {
+            const coneGeo = new THREE.ConeGeometry(0.3, 0.7, 16); coneGeo.translate(0, 0.35, 0);
+            const coneColors = new Float32Array(coneGeo.attributes.position.count * 3);
+            for (let i = 0; i < coneColors.length; i += 3) { coneColors[i] = 0.8; coneColors[i + 1] = 0; coneColors[i + 2] = 0; }
+            coneGeo.setAttribute('color', new THREE.BufferAttribute(coneColors, 3));
+            const rimGeo = new THREE.TorusGeometry(0.3, 0.1, 8, 16); rimGeo.rotateX(Math.PI / 2);
+            const rimColors = new Float32Array(rimGeo.attributes.position.count * 3); for (let i = 0; i < rimColors.length; i++) rimColors[i] = 1;
+            rimGeo.setAttribute('color', new THREE.BufferAttribute(rimColors, 3));
+            const ballGeo = new THREE.SphereGeometry(0.1, 8, 8); ballGeo.translate(0, 0.7, 0);
+            const ballColors = new Float32Array(ballGeo.attributes.position.count * 3); for (let i = 0; i < ballColors.length; i++) ballColors[i] = 1;
+            ballGeo.setAttribute('color', new THREE.BufferAttribute(ballColors, 3));
+            return BufferGeometryUtils.mergeGeometries([coneGeo, rimGeo, ballGeo]);
+        }
+
+        function createDeluxeGiftGeo() {
+            const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+            const bowGeo = new THREE.TorusKnotGeometry(0.3, 0.05, 64, 8);
+            bowGeo.rotateX(Math.PI / 2);
+            bowGeo.translate(0, 0.65, 0);
+            return BufferGeometryUtils.mergeGeometries([boxGeo, bowGeo]);
+        }
+
+        function createNeonFrameGeo() {
+            const width = 1.6, height = 2.0, thickness = 0.08, depth = 0.05;
+            const shape = new THREE.Shape();
+            shape.moveTo(-width / 2, -height / 2);
+            shape.lineTo(width / 2, -height / 2);
+            shape.lineTo(width / 2, height / 2);
+            shape.lineTo(-width / 2, height / 2);
+            shape.lineTo(-width / 2, -height / 2);
+
+            const hole = new THREE.Path();
+            hole.moveTo(-width / 2 + thickness, -height / 2 + thickness);
+            hole.lineTo(width / 2 - thickness, -height / 2 + thickness);
+            hole.lineTo(width / 2 - thickness, height / 2 - thickness);
+            hole.lineTo(-width / 2 + thickness, height / 2 - thickness);
+            hole.lineTo(-width / 2 + thickness, -height / 2 + thickness);
+            shape.holes.push(hole);
+
+            return new THREE.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: false });
+        }
+
+        const particles = [];
+        const frameParticles = [];
+        const dummy = new THREE.Object3D();
+        const colorHelper = new THREE.Color();
+
+        const getScatterPos = (radius) => {
+            const r = radius * Math.cbrt(Math.random());
+            const theta = Math.random() * 2 * Math.PI;
+            const phi = Math.acos(2 * Math.random() - 1);
+            return new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+        };
+
+        let meshRefs = {};
+        let frameMeshes = [];
+        let frameGlowMeshes = [];
+        let frameMaterials = [];
+        let frameGlowMaterials = [];
+        let TOTAL_VISUAL_PARTICLES = 0;
+
+        const frameGeo = new THREE.BoxGeometry(1.6, 2.0, 0.15);
+        const neonFrameGeo = createNeonFrameGeo();
+
+        const neonMaterial = new THREE.MeshStandardMaterial({
+            color: 0xFFFA00, emissive: 0xFFFA00, emissiveIntensity: 8.0,
+            metalness: 1.0, transparent: true, opacity: 1.0
+        });
+
+        function createParticles() {
+            const needleGeo = new THREE.CylinderGeometry(0.02, 0.1, 1.4, 4);
+            const needleMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.needle, roughness: 0.3, metalness: 0.2 });
+            const needleMesh = new THREE.InstancedMesh(needleGeo, needleMat, CONFIG.counts.needles);
+            scene.add(needleMesh); meshRefs.needle = needleMesh;
+
+            const giftGeo = createDeluxeGiftGeo();
+            const giftMat = new THREE.MeshStandardMaterial({ map: createGiftTexture('#EEEEEE'), color: 0xffffff, roughness: 0.1, metalness: 0.5 });
+            const totalGifts = CONFIG.counts.gifts + CONFIG.counts.groundGifts;
+            const giftMesh = new THREE.InstancedMesh(giftGeo, giftMat, totalGifts);
+            scene.add(giftMesh); meshRefs.gift = giftMesh;
+
+            const ballGeo = new THREE.SphereGeometry(0.5, 24, 24);
+            const ballMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.1 });
+            const totalBalls = CONFIG.counts.balls + CONFIG.counts.groundBalls;
+            const ballMesh = new THREE.InstancedMesh(ballGeo, ballMat, totalBalls);
+            scene.add(ballMesh); meshRefs.ball = ballMesh;
+
+            const caneGeo = createCandyGeo();
+            const caneMat = new THREE.MeshStandardMaterial({ map: createCandyTexture(), roughness: 0.4, metalness: 0.1 });
+            const totalCanes = CONFIG.counts.canes + CONFIG.counts.groundCanes;
+            const caneMesh = new THREE.InstancedMesh(caneGeo, caneMat, totalCanes);
+            scene.add(caneMesh); meshRefs.cane = caneMesh;
+
+            const sockGeo = createSockGeo();
+            const sockMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.1 });
+            const totalSocks = CONFIG.counts.socks + CONFIG.counts.groundSocks;
+            const sockMesh = new THREE.InstancedMesh(sockGeo, sockMat, totalSocks);
+            scene.add(sockMesh); meshRefs.sock = sockMesh;
+
+            const hatGeo = createHatGeo();
+            const hatMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.1 });
+            const hatMesh = new THREE.InstancedMesh(hatGeo, hatMat, CONFIG.counts.hats);
+            scene.add(hatMesh); meshRefs.hat = hatMesh;
+
+            const lightGeo = new THREE.SphereGeometry(0.15, 8, 8);
+            const lightMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 8.0, clearcoat: 1.0, roughness: 0.1 });
+            const lightMesh = new THREE.InstancedMesh(lightGeo, lightMat, CONFIG.counts.lights);
+            scene.add(lightMesh); meshRefs.light = lightMesh;
+
+            // USE GENERIC WOOD TEXTURE ONLY
+            const defaultWoodTex = createWoodenFrameTexture();
+
+            for (let i = 0; i < MAX_PHOTOS; i++) {
+                const mat = new THREE.MeshStandardMaterial({ map: defaultWoodTex, roughness: 0.5, metalness: 0.1 });
+                frameMaterials.push(mat);
+
+                const mesh = new THREE.Mesh(frameGeo, mat);
+                mesh.visible = true; // Make frames visible by default (as wood)
+                mesh.userData = { frameIndex: i, isPhotoFrame: true };
+
+                // CREATE SEPARATE PHOTO MESH TO AVOID CANVAS TAINTING
+                const photoGeo = new THREE.PlaneGeometry(1.25, 1.65);
+                // CRITICAL FIX FOR BLACK PHOTOS: Use MeshBasicMaterial (unlit)
+                // This ignores lighting conditions and renders the texture exactly as is.
+                const photoMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const photoMesh = new THREE.Mesh(photoGeo, photoMat);
+                photoMesh.position.z = 0.081; // Sit slightly in front of wood frame
+                photoMesh.name = "photoContent";
+                // Initially hide photo content mesh, show only wood
+                photoMesh.visible = false;
+                mesh.add(photoMesh);
+
+                scene.add(mesh);
+                frameMeshes.push(mesh);
+
+                const glowMat = new THREE.MeshStandardMaterial({
+                    color: 0xFFD700, emissive: 0xFFD700, emissiveIntensity: 4.0,
+                    roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.95
+                });
+                frameGlowMaterials.push(glowMat);
+                const glowMesh = new THREE.Mesh(neonFrameGeo, glowMat);
+                glowMesh.visible = false;
+                glowMesh.position.z = 0.08;
+                scene.add(glowMesh);
+                frameGlowMeshes.push(glowMesh);
+            }
+
+            const meshOffsets = { needle: 0, gift: 0, ball: 0, cane: 0, sock: 0, hat: 0, light: 0 };
+            let globalIndex = 0;
+            const generate = (mesh, count, type, weight, hasColor, isGroundItem = false) => {
+                const startOffset = meshOffsets[type] || 0;
+                for (let i = 0; i < count; i++) {
+                    const meshIndex = startOffset + i;
+                    let originalColor = null;
+                    if (hasColor) {
+                        const hex = CONFIG.colors.palette[Math.floor(Math.random() * CONFIG.colors.palette.length)];
+                        colorHelper.setHex(hex);
+                        mesh.setColorAt(meshIndex, colorHelper);
+                        originalColor = hex;
+                    }
+                    const heartColorHex = CONFIG.colors.heartPalette[Math.floor(Math.random() * CONFIG.colors.heartPalette.length)];
+                    let treePos = new THREE.Vector3();
+                    let scale = 1;
+                    let rotation = new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+
+                    if (isGroundItem) {
+                        const r = CONFIG.tree.radius + 1.5 + Math.random() * 9;
+                        const theta = Math.random() * Math.PI * 2;
+                        scale = 0.5 + Math.random() * 2.0;
+                        let heightOffset = 0.6 * scale;
+                        if (type === 'cane' || type === 'sock') heightOffset = 0.1;
+                        treePos.set(r * Math.cos(theta), -CONFIG.tree.height / 2 + heightOffset, r * Math.sin(theta));
+                        if (type === 'gift') {
+                            if (Math.random() > 0.4) rotation = new THREE.Euler(0, Math.random() * Math.PI * 2, 0);
+                            else rotation = new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI * 2, Math.random() * Math.PI);
+                        } else {
+                            rotation = new THREE.Euler(Math.PI / 2, Math.random() * Math.PI * 2, (Math.random() - 0.5));
+                        }
+                    } else {
+                        const yNorm = i / count;
+                        const rBase = CONFIG.tree.radius * (1 - yNorm);
+                        let r = rBase + (Math.random() - 0.5) * 1.5;
+                        let y = (yNorm * CONFIG.tree.height) - (CONFIG.tree.height / 2);
+                        const theta = i * 2.4 + Math.random();
+                        if (type === 'gift') { r = Math.random() * 9; y = -CONFIG.tree.height / 2 + 1.5 + Math.random() * 3; scale = 0.8 + Math.random() * 0.5; }
+                        else if (type === 'light') { r = rBase * 1.1; }
+                        treePos.set(r * Math.cos(theta), y, r * Math.sin(theta));
+                    }
+
+                    let scatterPos = type === 'needle' ? getScatterPos(500) : getScatterPos(50);
+                    const totalParticles = CONFIG.counts.needles + CONFIG.counts.balls + CONFIG.counts.gifts + CONFIG.counts.groundGifts + CONFIG.counts.canes + CONFIG.counts.socks + CONFIG.counts.hats + CONFIG.counts.lights;
+                    const heartPos = getHeartPosition(globalIndex, totalParticles);
+                    const heartIndex = globalIndex++;
+
+                    dummy.position.copy(scatterPos); dummy.updateMatrix();
+                    mesh.setMatrixAt(meshIndex, dummy.matrix);
+
+                    const randomStaticQuaternion = new THREE.Quaternion();
+                    randomStaticQuaternion.setFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2));
+                    const needleRandomRot = new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, (Math.random() - 0.5) * 0.5);
+
+                    particles.push({
+                        mesh, index: meshIndex, type, heartIndex,
+                        weight: weight * (0.8 + Math.random() * 0.4),
+                        treePos, scatterPos, heartPos,
+                        currentPos: scatterPos.clone(),
+                        baseScale: scale,
+                        rotation: rotation,
+                        spinSpeed: { x: (Math.random() - 0.5) * 0.008, y: (Math.random() - 0.5) * 0.008 },
+                        originalColor, heartColor: heartColorHex, hasColor,
+                        heartRotationSpeed: new THREE.Euler((Math.random() - 0.5) * 0.003, (Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.002),
+                        heartCurrentRotation: new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2),
+                        originalTreePos: treePos.clone(),
+                        randomStaticQuaternion, needleRandomRot, isGroundItem
+                    });
+                }
+                meshOffsets[type] = startOffset + count;
+            };
+
+            generate(needleMesh, CONFIG.counts.needles, 'needle', CONFIG.physics.needle, false);
+            generate(giftMesh, CONFIG.counts.gifts, 'gift', CONFIG.physics.gift, true);
+            generate(ballMesh, CONFIG.counts.balls, 'ball', CONFIG.physics.ball, true);
+            generate(caneMesh, CONFIG.counts.canes, 'cane', CONFIG.physics.common, false);
+            generate(sockMesh, CONFIG.counts.socks, 'sock', CONFIG.physics.common, true);
+            generate(hatMesh, CONFIG.counts.hats, 'hat', CONFIG.physics.common, false);
+            generate(lightMesh, CONFIG.counts.lights, 'light', CONFIG.physics.light, true);
+
+            generate(giftMesh, CONFIG.counts.groundGifts, 'gift', CONFIG.physics.gift, true, true);
+            generate(caneMesh, CONFIG.counts.groundCanes, 'cane', CONFIG.physics.common, false, true);
+            generate(sockMesh, CONFIG.counts.groundSocks, 'sock', CONFIG.physics.common, true, true);
+            generate(ballMesh, CONFIG.counts.groundBalls, 'ball', CONFIG.physics.ball, true, true);
+
+            for (let i = 0; i < MAX_PHOTOS; i++) {
+                const mesh = frameMeshes[i];
+                const frameT = i / MAX_PHOTOS;
+                const frameH = CONFIG.tree.height * 0.70;
+                const bottomOffset = -CONFIG.tree.height / 2 + 3;
+                const frameY = bottomOffset + (frameT * frameH);
+                const frameR = CONFIG.tree.radius * (1 - (frameY + CONFIG.tree.height / 2) / CONFIG.tree.height) * 0.9 + 2.0;
+
+                const treePos = new THREE.Vector3(frameR * Math.cos(i * 1.2 + 0.5), frameY, frameR * Math.sin(i * 1.2 + 0.5));
+                const heartScatterPos = getHeartScatterPosition(i, MAX_PHOTOS);
+                const scatterPos = getScatterPos(35);
+                const randomStaticQuaternion = new THREE.Quaternion();
+                randomStaticQuaternion.setFromEuler(new THREE.Euler((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.3));
+
+                frameParticles.push({
+                    mesh, frameIndex: i, type: 'frame',
+                    weight: CONFIG.physics.frame,
+                    treePos: treePos.clone(), scatterPos, heartScatterPos,
+                    currentPos: scatterPos.clone(),
+                    baseScale: 1.3,
+                    rotation: new THREE.Euler(0, 0, 0),
+                    spinSpeed: { x: (Math.random() - 0.5) * 0.003, y: (Math.random() - 0.5) * 0.003 },
+                    floatOffset: Math.random() * Math.PI * 2,
+                    randomStaticQuaternion,
+                    swingPhase: Math.random() * Math.PI * 2
+                });
+            }
+
+            TOTAL_VISUAL_PARTICLES = particles.length;
+
+            const smallHeartGeo = createSmallHeartGeo();
+            const smallHeartMat = new THREE.MeshStandardMaterial({
+                color: 0xFF69B4, emissive: 0xFF69B4, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.2, transparent: true, opacity: 0.85
+            });
+            const smallHeartMesh = new THREE.InstancedMesh(smallHeartGeo, smallHeartMat, TOTAL_VISUAL_PARTICLES);
+            scene.add(smallHeartMesh); meshRefs.smallHeart = smallHeartMesh;
+
+            for (let i = 0; i < TOTAL_VISUAL_PARTICLES; i++) {
+                const hex = CONFIG.colors.heartPalette[Math.floor(Math.random() * CONFIG.colors.heartPalette.length)];
+                colorHelper.setHex(hex); smallHeartMesh.setColorAt(i, colorHelper);
+                dummy.position.set(0, -999, 0); dummy.scale.setScalar(0.001); dummy.updateMatrix();
+                smallHeartMesh.setMatrixAt(i, dummy.matrix);
+            }
+            if (smallHeartMesh.instanceColor) smallHeartMesh.instanceColor.needsUpdate = true;
+        }
+        createParticles();
+
+        async function updateFrameTextures() {
+            let sources = [];
+            if (uploadedImages.length > 0) {
+                sources = uploadedImages;
+            } else if (defaultImages.length > 0) {
+                sources = defaultImages;
+            }
+
+            activePhotoCount = sources.length;
+
+            for (let i = 0; i < MAX_PHOTOS; i++) {
+                const mesh = frameMeshes[i];
+                const glowMesh = frameGlowMeshes[i];
+                const photoMesh = mesh.children.find(c => c.name === "photoContent");
+
+                // Always update position for all frames
+                const frameT = i / Math.max(MAX_PHOTOS, 1); // Use constant to keep shape
+                const frameH = CONFIG.tree.height * 0.70;
+                const bottomOffset = -CONFIG.tree.height / 2 + 3;
+                const frameY = bottomOffset + (frameT * frameH);
+                const frameR = CONFIG.tree.radius * (1 - (frameY + CONFIG.tree.height / 2) / CONFIG.tree.height) * 0.9 + 2.0;
+                frameParticles[i].treePos.set(frameR * Math.cos(i * 1.2 + 0.5), frameY, frameR * Math.sin(i * 1.2 + 0.5));
+                frameParticles[i].heartScatterPos = getHeartScatterPosition(i, sources.length || MAX_PHOTOS);
+
+                if (i < sources.length) {
+                    mesh.visible = true;
+                    if (photoMesh) photoMesh.visible = true; // Show photo plane
+
+                    let src = sources[i];
+                    if (typeof src === 'string') {
+                        if (!src.startsWith('blob:')) src = encodeURI(src);
+                    } else if (src instanceof Image) {
+                        src = src.src;
+                    }
+
+                    const loader = new THREE.TextureLoader();
+                    loader.load(src, (texture) => {
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                        texture.generateMipmaps = false;
+                        texture.minFilter = THREE.LinearFilter;
+                        texture.magFilter = THREE.LinearFilter;
+                        texture.needsUpdate = true;
+
+                        if (photoMesh) {
+                            photoMesh.material.map = texture;
+                            photoMesh.material.needsUpdate = true;
+                        }
+                    }, undefined, (err) => {
+                        console.warn(`Texture load failed for frame ${i}`, err);
+                    });
+                } else {
+                    // Frame without photo: show only wood frame, hide photo plane
+                    mesh.visible = true;
+                    if (photoMesh) photoMesh.visible = false;
+                    glowMesh.visible = false;
+                }
+            }
+
+            let txt = "";
+            if (defaultImages.length > 0 && uploadedImages.length === 0) txt += `默认:${defaultImages.length} `;
+            if (uploadedImages.length > 0) txt += `上传:${uploadedImages.length} `;
+            photoCountDisplay.textContent = txt || "暂无照片";
+        }
+
+        const photoModal = document.getElementById('photo-modal');
+        const modalImg = document.getElementById('modal-image-display');
+        function openPhotoModal(imageSrc) { modalImg.src = imageSrc; photoModal.classList.add('active'); }
+        function closePhotoModal() { photoModal.classList.remove('active'); }
+        photoModal.addEventListener('click', closePhotoModal);
+
+        renderer.domElement.addEventListener('click', (event) => {
+            if (photoModal.classList.contains('active')) return;
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const visibleFrames = frameMeshes.filter((m, idx) => m.visible);
+            if (visibleFrames.length === 0) return;
+            const intersects = raycaster.intersectObjects(visibleFrames, false);
+            if (intersects.length > 0) {
+                const frameIndex = intersects[0].object.userData.frameIndex;
+                let sources = uploadedImages.length > 0 ? uploadedImages : defaultImages;
+
+                // Only open if there is a photo source
+                if (frameIndex !== undefined && frameIndex < sources.length) {
+                    let src = sources[frameIndex];
+                    if (typeof src === 'string' && !src.startsWith('blob:')) src = encodeURI(src);
+                    else if (src instanceof Image) src = src.src;
+                    openPhotoModal(src);
+                }
+            }
+        });
+
+        // --- ADDED MISSING FUNCTION: initServerResources ---
+        async function initServerResources() {
+            try {
+                // Fetch Images
+                const imgRes = await fetch('/api/files/images');
+                if (imgRes.ok) {
+                    const imgFiles = await imgRes.json();
+                    if (imgFiles.length > 0) {
+                        // Sort by numeric filename if possible
+                        defaultImages = imgFiles.sort((a, b) => {
+                            const nA = parseInt(a.name) || 9999;
+                            const nB = parseInt(b.name) || 9999;
+                            return nA - nB;
+                        }).map(f => f.path);
+                        updateFrameTextures();
+                        statusMessage.textContent += ` 📸 已加载 ${defaultImages.length} 张照片`;
+                    }
+                }
+
+                // Fetch Music
+                const musicRes = await fetch('/api/files/music');
+                if (musicRes.ok) {
+                    const musicFiles = await musicRes.json();
+                    const targetMusic = musicFiles.find(f => f.name.toLowerCase().includes('bleeding')) || musicFiles[0];
+                    if (targetMusic) {
+                        defaultAudioURL = targetMusic.path;
+                        audioStatus.textContent = `🎵 准备播放: ${targetMusic.name}`;
+                        statusMessage.textContent += ` 🎵 已加载音乐`;
+                    }
+                }
+
+                // Fetch Lyrics
+                const lrcEnRes = await fetch('/api/files/lyrics_en');
+                if (lrcEnRes.ok) {
+                    const files = await lrcEnRes.json();
+                    if (files.length > 0) {
+                        const content = await fetch(files[0].path).then(r => r.text());
+                        defaultLrcEnContent = content;
+                        loadLyric('en');
+                    }
+                }
+                const lrcCnRes = await fetch('/api/files/lyrics_cn');
+                if (lrcCnRes.ok) {
+                    const files = await lrcCnRes.json();
+                    if (files.length > 0) {
+                        const content = await fetch(files[0].path).then(r => r.text());
+                        defaultLrcCnContent = content;
+                        loadLyric('cn');
+                    }
+                }
+
+                // IF we successfully loaded resources, skip the folder selection screen
+                if (defaultImages.length > 0 || defaultAudioURL) {
+                    offlineOverlay.style.display = 'none';
+                    startOverlay.style.display = 'flex';
+                } else {
+                    // If server returns nothing (maybe running without server.js or empty folders), show select folder
+                    offlineOverlay.style.display = 'flex';
+                }
+
+            } catch (e) {
+                console.log("Server resource loading failed (Offline Mode?):", e);
+                // Fallback to manual selection overlay
+                offlineOverlay.style.display = 'flex';
+            }
+        }
+
+        // --- FOLDER SELECTION LOGIC (OFFLINE MODE) ---
+        folderInput.addEventListener('change', async (event) => {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            // Sort files alphabetically to keep image order
+            const fileList = Array.from(files).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+            const newImages = [];
+            let musicFile = null;
+            let lrcEn = null;
+            let lrcCn = null;
+
+            let countImg = 0;
+
+            for (const file of fileList) {
+                // webkitRelativePath contains "ProjectName/images/1.png"
+                const path = file.webkitRelativePath;
+                const pathLower = path.toLowerCase();
+
+                // Detect Music (looks for 'music' path segment and audio extension)
+                if (pathLower.includes('music') && /\.(mp3|flac|wav|m4a)$/i.test(pathLower)) {
+                    // Prefer files named "bleeding" or take the first one
+                    if (pathLower.includes('bleeding_love') || !musicFile) {
+                        musicFile = file;
+                    }
+                }
+                // Detect Images (looks for 'images' or '照片' in path segment, supports more formats)
+                else if ((pathLower.includes('images') || pathLower.includes('image') || pathLower.includes('照片')) && /\.(png|jpe?g|webp|bmp|gif)$/i.test(pathLower)) {
+                    newImages.push(URL.createObjectURL(file));
+                    countImg++;
+                }
+                // Detect Lyrics (in specific folders)
+                else if (pathLower.endsWith('.lrc') || pathLower.endsWith('.txt')) {
+                    if (pathLower.includes('lyrics_cn') || pathLower.includes('/cn/') || pathLower.includes('chinese')) {
+                        lrcCn = await file.text();
+                    } else if (pathLower.includes('lyrics_en') || pathLower.includes('/en/') || pathLower.includes('english')) {
+                        lrcEn = await file.text();
+                    }
+                }
+            }
+
+            // --- Apply Loaded Assets ---
+            let statusTxt = "";
+
+            if (newImages.length > 0) {
+                defaultImages = newImages;
+                updateFrameTextures();
+                statusTxt += `✅ 已加载 ${newImages.length} 张照片. `;
+            } else {
+                statusTxt += `⚠️ 未找到照片(请确保文件夹名为 images). `;
+            }
+
+            if (musicFile) {
+                defaultAudioURL = URL.createObjectURL(musicFile);
+                audioStatus.textContent = `🎵 准备播放: ${musicFile.name}`;
+                statusTxt += `✅ 已加载音乐. `;
+            } else {
+                statusTxt += `⚠️ 未找到音乐(music文件夹). `;
+            }
+
+            if (lrcEn) {
+                uploadedLrcEnContent = lrcEn;
+                loadLyric('en');
+            }
+            if (lrcCn) {
+                uploadedLrcCnContent = lrcCn;
+                loadLyric('cn');
+            }
+            if (lrcEn || lrcCn) statusTxt += `✅ 已加载歌词.`;
+
+            // Switch Overlays: Hide Launch Config -> Show Gameplay Instructions
+            offlineOverlay.style.display = 'none';
+            startOverlay.style.display = 'flex';
+            statusMessage.textContent = statusTxt;
+        });
+
+        let audioContext = null, analyser = null, dataArray = null, audioSource = null, audioElement = null, micStream = null, currentAudioSource = null;
+        const audioConfig = { sensitivity: 3.0, intensity: 1.0, smoothing: 0.6, fftSize: 256 };
+        let audioData = { bass: 0, mid: 0, treble: 0, overall: 0, beat: false, heartBeatScale: 1.0 };
+
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = audioConfig.fftSize;
+                analyser.smoothingTimeConstant = audioConfig.smoothing;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        const audioPanel = document.getElementById('audio-panel');
+        const lightPanel = document.getElementById('light-panel');
+        const visualPanel = document.getElementById('visual-panel');
+        const musicBtn = document.getElementById('music-toggle-btn');
+        const lightBtn = document.getElementById('light-toggle-btn');
+        const visualBtn = document.getElementById('visual-toggle-btn');
+        const heartBrightnessBtn = document.getElementById('heart-brightness-btn');
+        const micSourceBtn = document.getElementById('mic-source-btn');
+        const fileSourceBtn = document.getElementById('file-source-btn');
+        const fileUploadSection = document.getElementById('file-upload-section');
+
+        const audioFileInput = document.getElementById('audio-file-input');
+        const audioFileLabel = document.getElementById('audio-file-label');
+        const audioFileClear = document.getElementById('audio-file-clear');
+
+        const audioStatus = document.getElementById('audio-status');
+        const playBtn = document.getElementById('play-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeValue = document.getElementById('volume-value');
+        const sensitivitySlider = document.getElementById('sensitivity-slider');
+        const sensitivityValue = document.getElementById('sensitivity-value');
+        const intensitySlider = document.getElementById('intensity-slider');
+        const intensityValue = document.getElementById('intensity-value');
+        const photoFileInput = document.getElementById('photo-file-input');
+
+        const lightAngleHSlider = document.getElementById('light-angle-h-slider');
+        const lightAngleHValue = document.getElementById('light-angle-h-value');
+        const lightAngleVSlider = document.getElementById('light-angle-v-slider');
+        const lightAngleVValue = document.getElementById('light-angle-v-value');
+        const lightIntensitySlider = document.getElementById('light-intensity-slider');
+        const lightIntensityValue = document.getElementById('light-intensity-value');
+
+        const cameraDistSlider = document.getElementById('camera-dist-slider');
+        const cameraDistValue = document.getElementById('camera-dist-value');
+        const autoRotateSlider = document.getElementById('auto-rotate-slider');
+        const autoRotateValue = document.getElementById('auto-rotate-value');
+
+        const lrcEnInput = document.getElementById('lrc-en-input');
+        const lrcEnLabel = document.getElementById('lrc-en-label');
+        const lrcEnClear = document.getElementById('lrc-en-clear');
+
+        const lrcCnInput = document.getElementById('lrc-cn-input');
+        const lrcCnLabel = document.getElementById('lrc-cn-label');
+        const lrcCnClear = document.getElementById('lrc-cn-clear');
+
+        function updateLightPosition() {
+            const hRad = THREE.MathUtils.degToRad(lightSettings.angleH);
+            const vRad = THREE.MathUtils.degToRad(lightSettings.angleV);
+            const distance = 80;
+            mainLight.position.set(distance * Math.cos(vRad) * Math.sin(hRad), distance * Math.sin(vRad), distance * Math.cos(vRad) * Math.cos(hRad));
+            mainLight.lookAt(0, 0, 0);
+        }
+
+        function updateLightIntensity() {
+            mainLight.intensity = lightSettings.intensity * 3;
+            headLight.intensity = lightSettings.baseIntensity * lightSettings.intensity;
+        }
+
+        lightAngleHSlider.addEventListener('input', (e) => { lightSettings.angleH = parseFloat(e.target.value); lightAngleHValue.textContent = lightSettings.angleH + '°'; updateLightPosition(); });
+        lightAngleVSlider.addEventListener('input', (e) => { lightSettings.angleV = parseFloat(e.target.value); lightAngleVValue.textContent = lightSettings.angleV + '°'; updateLightPosition(); });
+        lightIntensitySlider.addEventListener('input', (e) => { lightSettings.intensity = parseFloat(e.target.value) / 50; lightIntensityValue.textContent = e.target.value + '%'; updateLightIntensity(); });
+
+        cameraDistSlider.addEventListener('input', (e) => {
+            cameraSettings.distance = parseInt(e.target.value);
+            cameraDistValue.textContent = cameraSettings.distance;
+            controls.minDistance = cameraSettings.distance;
+            controls.maxDistance = cameraSettings.distance;
+            controls.update();
+        });
+
+        autoRotateSlider.addEventListener('input', (e) => {
+            cameraSettings.autoRotateSpeed = parseFloat(e.target.value);
+            autoRotateValue.textContent = cameraSettings.autoRotateSpeed === 0 ? "0 (关闭)" : cameraSettings.autoRotateSpeed.toFixed(1);
+        });
+
+        micSourceBtn.addEventListener('click', async () => {
+            try {
+                initAudioContext();
+                if (audioElement) audioElement.pause();
+                if (audioSource) audioSource.disconnect();
+                micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioSource = audioContext.createMediaStreamSource(micStream);
+                audioSource.connect(analyser);
+                currentAudioSource = 'microphone';
+                micSourceBtn.classList.add('active'); fileSourceBtn.classList.remove('active');
+                fileUploadSection.style.display = 'none';
+                audioStatus.textContent = '🎤 麦克风已激活';
+            } catch (err) { alert('Microphone permission denied.'); }
+        });
+
+        fileSourceBtn.addEventListener('click', () => {
+            if (micStream) { micStream.getTracks().forEach(track => track.stop()); micStream = null; }
+            if (audioSource && currentAudioSource === 'microphone') audioSource.disconnect();
+            currentAudioSource = 'file';
+            fileSourceBtn.classList.add('active'); micSourceBtn.classList.remove('active');
+            fileUploadSection.style.display = 'block';
+            playSelectedMusic();
+        });
+
+        photoFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files).slice(0, MAX_PHOTOS);
+            if (files.length === 0) return;
+            uploadedImages = [];
+            let loadedCount = 0;
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        uploadedImages[index] = img;
+                        loadedCount++;
+                        if (loadedCount === files.length) {
+                            updateFrameTextures();
+                        }
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        function playSelectedMusic() {
+            const urlToPlay = uploadedAudioURL || defaultAudioURL;
+
+            if (!urlToPlay) {
+                audioStatus.textContent = "请上传音乐或添加默认文件";
+                if (audioElement) { audioElement.pause(); audioElement.currentTime = 0; }
+                playBtn.disabled = true; pauseBtn.disabled = true; stopBtn.disabled = true;
+                return;
+            }
+
+            initAudioContext();
+
+            if (!audioElement) {
+                audioElement = new Audio();
+                audioElement.loop = true;
+                audioElement.crossOrigin = "anonymous";
+                audioElement.onerror = (e) => {
+                    console.error("Audio Playback Error:", e);
+                    audioStatus.textContent = `❌ 播放失败`;
+                };
+            }
+
+            let finalUrl = urlToPlay;
+            if (typeof urlToPlay === 'string' && !urlToPlay.startsWith('blob:')) {
+                finalUrl = encodeURI(urlToPlay);
+            }
+
+            if (audioElement.src !== finalUrl) {
+                audioElement.src = finalUrl;
+                audioElement.load();
+            }
+
+            audioElement.volume = volumeSlider.value / 100;
+
+            if (audioSource) { try { audioSource.disconnect(); } catch (e) { } }
+
+            audioSource = audioContext.createMediaElementSource(audioElement);
+            audioSource.connect(analyser);
+            analyser.connect(audioContext.destination);
+            currentAudioSource = 'file';
+
+            const displayName = uploadedAudioURL ? "用户上传文件" : "默认音乐";
+            audioStatus.textContent = `🎵 正在播放： ${displayName}`;
+
+            playBtn.disabled = false; pauseBtn.disabled = false; stopBtn.disabled = false;
+
+            const playPromise = audioElement.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Autoplay prevented:", error);
+                    audioStatus.textContent = "⏸️ 点击播放开始 (浏览器限制)";
+                });
+            }
+        }
+
+        // --- START GAME BUTTON HANDLER ---
+        // Guide Button: Click "Next" -> Show Final Hint
+        startBtn.addEventListener('click', () => {
+            startOverlay.style.opacity = 0;
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+                finalHintOverlay.style.display = 'flex';
+                // Trigger reflow
+                void finalHintOverlay.offsetWidth;
+                finalHintOverlay.classList.add('active');
+            }, 500);
+        });
+
+        // Final Start Button: Click "Start" -> Hide Overlay, Play Music
+        finalStartBtn.addEventListener('click', () => {
+            finalHintOverlay.style.opacity = 0;
+            setTimeout(() => {
+                finalHintOverlay.style.display = 'none';
+
+                initAudioContext();
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        playSelectedMusic();
+                    });
+                } else {
+                    playSelectedMusic();
+                }
+            }, 500);
+        });
+
+        audioFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            uploadedAudioURL = URL.createObjectURL(file);
+            audioFileLabel.textContent = `🎵 ${file.name}`;
+            playSelectedMusic();
+        });
+
+        audioFileClear.addEventListener('click', () => {
+            uploadedAudioURL = null;
+            audioFileInput.value = "";
+            audioFileLabel.textContent = "📁 上传音乐文件";
+            playSelectedMusic();
+        });
+
+        function parseLRC(lrcContent) {
+            if (!lrcContent) return [];
+            const lines = lrcContent.split('\n');
+            const result = [];
+            const timeExp = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+
+            for (const line of lines) {
+                const match = timeExp.exec(line);
+                if (match) {
+                    const minutes = parseInt(match[1], 10);
+                    const seconds = parseInt(match[2], 10);
+                    const milliseconds = parseInt(match[3], 10);
+                    const msVal = match[3].length === 2 ? milliseconds * 10 : milliseconds;
+                    const time = minutes * 60 + seconds + msVal / 1000;
+                    const text = line.replace(timeExp, '').trim();
+                    if (text) {
+                        result.push({ time, text });
+                    }
+                }
+            }
+            return result.sort((a, b) => a.time - b.time);
+        }
+
+        function loadLyric(type) {
+            if (type === 'en') {
+                const content = uploadedLrcEnContent || defaultLrcEnContent;
+                lyricsDataEn = parseLRC(content);
+                currentEnIndex = -1;
+                const label = uploadedLrcEnContent ? "已上传" : (defaultLrcEnContent ? "默认" : "无");
+                lyricElement.querySelector('.original').textContent = `English Lyrics: Loaded`;
+            } else if (type === 'cn') {
+                const content = uploadedLrcCnContent || defaultLrcCnContent;
+                lyricsDataCn = parseLRC(content);
+                const label = uploadedLrcCnContent ? "已上传" : (defaultLrcCnContent ? "默认" : "无");
+                lyricElement.querySelector('.translation').textContent = `中文歌词: 已加载`;
+            }
+            lyricElement.classList.add('active');
+        }
+
+        lrcEnInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            lrcEnLabel.textContent = `📄 ${file.name}`;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                uploadedLrcEnContent = ev.target.result;
+                loadLyric('en');
+            };
+            reader.readAsText(file);
+        });
+
+        lrcEnClear.addEventListener('click', () => {
+            uploadedLrcEnContent = null;
+            lrcEnInput.value = "";
+            lrcEnLabel.textContent = "📁 上传原首歌词 (英文)";
+            loadLyric('en');
+        });
+
+        lrcCnInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            lrcCnLabel.textContent = `📄 ${file.name}`;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                uploadedLrcCnContent = ev.target.result;
+                loadLyric('cn');
+            };
+            reader.readAsText(file);
+        });
+
+        lrcCnClear.addEventListener('click', () => {
+            uploadedLrcCnContent = null;
+            lrcCnInput.value = "";
+            lrcCnLabel.textContent = "📁 上传翻译歌词 (中文)";
+            loadLyric('cn');
+        });
+
+        const heartBrightnessLevels = [
+            { val: 0.3, text: '爱心：暗淡' },
+            { val: 0.9, text: '爱心：正常' },
+            { val: 1.5, text: '爱心：明亮' }
+        ];
+        let currentBrightnessIndex = 1;
+
+        function applyBrightness(index) {
+            if (index < 0 || index >= heartBrightnessLevels.length) return;
+            currentBrightnessIndex = index;
+            const setting = heartBrightnessLevels[currentBrightnessIndex];
+            heartBrightnessBtn.querySelector('span').textContent = '✨ ' + setting.text;
+            if (meshRefs.smallHeart) {
+                meshRefs.smallHeart.material.emissiveIntensity = setting.val;
+            }
+        }
+
+        heartBrightnessBtn.addEventListener('click', () => {
+            let nextIndex = (currentBrightnessIndex + 1) % heartBrightnessLevels.length;
+            applyBrightness(nextIndex);
+        });
+
+        playBtn.addEventListener('click', () => { if (audioElement && audioElement.paused) audioElement.play(); });
+        pauseBtn.addEventListener('click', () => { if (audioElement && !audioElement.paused) audioElement.pause(); });
+        stopBtn.addEventListener('click', () => { if (audioElement) { audioElement.pause(); audioElement.currentTime = 0; } });
+        volumeSlider.addEventListener('input', (e) => { if (audioElement) audioElement.volume = e.target.value / 100; volumeValue.textContent = e.target.value + '%'; });
+        sensitivitySlider.addEventListener('input', (e) => { audioConfig.sensitivity = parseFloat(e.target.value); sensitivityValue.textContent = audioConfig.sensitivity.toFixed(1) + 'x'; });
+        intensitySlider.addEventListener('input', (e) => { audioConfig.intensity = parseInt(e.target.value) / 100; intensityValue.textContent = e.target.value + '%'; });
+
+        let lastBeatTime = 0;
+        function analyzeAudio() {
+            if (!analyser || !dataArray) return;
+            analyser.getByteFrequencyData(dataArray);
+            const bufferLength = dataArray.length;
+            const bassEnd = Math.floor(bufferLength * 0.15);
+            const midEnd = Math.floor(bufferLength * 0.6);
+            let bassSum = 0, midSum = 0, trebleSum = 0, overallSum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const value = dataArray[i] / 255;
+                overallSum += value;
+                if (i < bassEnd) bassSum += value;
+                else if (i < midEnd) midSum += value;
+                else trebleSum += value;
+            }
+            audioData.bass = (bassSum / bassEnd) * audioConfig.sensitivity;
+            audioData.mid = (midSum / (midEnd - bassEnd)) * audioConfig.sensitivity;
+            audioData.treble = (trebleSum / (bufferLength - midEnd)) * audioConfig.sensitivity;
+            audioData.overall = (overallSum / bufferLength) * audioConfig.sensitivity;
+            const currentTime = Date.now();
+            if (audioData.overall > 0.4 && (currentTime - lastBeatTime > 100)) { audioData.beat = true; lastBeatTime = currentTime; }
+            else { audioData.beat = false; }
+            const targetScale = 1.0 + (audioData.bass * 0.15 - audioData.treble * 0.05 + (audioData.beat ? 0.1 : 0)) * audioConfig.intensity;
+            audioData.heartBeatScale = THREE.MathUtils.lerp(audioData.heartBeatScale, Math.max(0.7, Math.min(1.3, targetScale)), 0.15);
+        }
+
+        const visualizer = document.getElementById('audio-visualizer');
+        const freqBars = [];
+        for (let i = 0; i < 20; i++) {
+            const bar = document.createElement('div'); bar.className = 'freq-bar';
+            bar.style.left = `${i * 5}%`; bar.style.width = `4.5%`; visualizer.appendChild(bar); freqBars.push(bar);
+        }
+        function updateVisualizer() {
+            if (!dataArray) return;
+            const step = Math.floor(dataArray.length / 20);
+            freqBars.forEach((bar, i) => { bar.style.height = `${(dataArray[i * step] / 255) * 100}%`; });
+        }
+
+        function updateUIStyle(isHeartMode) {
+            const musicBtn = document.getElementById('music-toggle-btn');
+            const btns = document.querySelectorAll('.sidebar-btn');
+            const panels = document.querySelectorAll('.control-panel');
+
+            if (isHeartMode) {
+                mainTitle.classList.add('heart-mode'); mainTitle.textContent = "With Love ♥";
+                camPreview.classList.add('heart-mode'); uiPanel.classList.add('heart-mode');
+                gestureText.classList.add('heart-mode');
+                btns.forEach(b => b.classList.add('heart-mode'));
+                panels.forEach(p => p.classList.add('heart-mode'));
+                lyricElement.classList.add('heart-mode');
+            } else {
+                mainTitle.classList.remove('heart-mode'); mainTitle.textContent = "Merry Christmas!";
+                camPreview.classList.remove('heart-mode'); uiPanel.classList.remove('heart-mode');
+                gestureText.classList.remove('heart-mode');
+                btns.forEach(b => b.classList.remove('heart-mode'));
+                panels.forEach(p => p.classList.remove('heart-mode'));
+                lyricElement.classList.remove('heart-mode');
+            }
+        }
+
+        let currentColorMode = 'tree';
+        function updateParticleColors(toHeart) {
+            if (toHeart && currentColorMode !== 'heart') {
+                currentColorMode = 'heart';
+                particles.forEach(p => { if (p.hasColor) { colorHelper.setHex(p.heartColor); p.mesh.setColorAt(p.index, colorHelper); } });
+                if (meshRefs.needle) meshRefs.needle.material.color.setHex(0xFF69B4);
+            } else if (!toHeart && currentColorMode !== 'tree') {
+                currentColorMode = 'tree';
+                particles.forEach(p => { if (p.hasColor && p.originalColor) { colorHelper.setHex(p.originalColor); p.mesh.setColorAt(p.index, colorHelper); } });
+                if (meshRefs.needle) meshRefs.needle.material.color.setHex(CONFIG.colors.needle);
+            }
+            Object.values(meshRefs).forEach(mesh => { if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; });
+        }
+
+        const starShape = new THREE.Shape();
+        for (let i = 0; i < 10; i++) { const l = i % 2 == 1 ? 0.6 : 1.5; const a = i / 5 * Math.PI; starShape.lineTo(Math.cos(a) * l, Math.sin(a) * l); }
+        const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.4, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1, bevelSegments: 2 });
+        const starMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, emissive: CONFIG.colors.gold, emissiveIntensity: 2.0, roughness: 0.1, metalness: 1.0 });
+        const starMesh = new THREE.Mesh(starGeo, starMat);
+        starMesh.position.set(0, CONFIG.tree.height / 2 + 1.5, 0); scene.add(starMesh);
+
+        const ribbonPoints = [];
+        const ribbonTurns = 6.5;
+        const ribbonHeight = CONFIG.tree.height + 1;
+        const ribbonStartY = CONFIG.tree.height / 2;
+
+        for (let i = 0; i <= 200; i++) {
+            const t = i / 200;
+            const y = ribbonStartY - (t * ribbonHeight);
+            const hNorm = (y + CONFIG.tree.height / 2) / CONFIG.tree.height;
+            let rCone = CONFIG.tree.radius * (1 - Math.max(0, hNorm));
+            const r = rCone + 0.9;
+            const angle = t * Math.PI * 2 * ribbonTurns;
+            if (y > -CONFIG.tree.height / 2 - 0.5) {
+                ribbonPoints.push(new THREE.Vector3(Math.cos(angle) * r, y, Math.sin(angle) * r));
+            }
+        }
+
+        const ribbonGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ribbonPoints), 150, 0.15, 8, false);
+        const ribbonMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, emissive: CONFIG.colors.gold, emissiveIntensity: 3, transparent: true, opacity: 0.8 });
+        const ribbonMesh = new THREE.Mesh(ribbonGeo, ribbonMat); scene.add(ribbonMesh);
+
+        const snowGeo = new THREE.BufferGeometry();
+        const snowPos = new Float32Array(CONFIG.counts.snow * 3);
+        const snowVel = new Float32Array(CONFIG.counts.snow);
+        const snowData = [];
+        const groundBaseY = -CONFIG.tree.height / 2 - 1.0;
+
+        for (let i = 0; i < CONFIG.counts.snow; i++) {
+            const x = (Math.random() - 0.5) * 120, z = (Math.random() - 0.5) * 120, y = Math.random() * 80;
+            snowPos[i * 3] = x; snowPos[i * 3 + 1] = y; snowPos[i * 3 + 2] = z;
+            snowVel[i] = 0.05 + Math.random() * 0.1;
+            const dist = Math.sqrt(x * x + z * z);
+            snowData.push({ state: 0, groundY: groundBaseY + Math.max(0, 4.5 * Math.exp(-(dist * dist) / 60)) + Math.random() * 0.5 });
+        }
+        snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+        const snowMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+        const snowSystem = new THREE.Points(snowGeo, snowMat); scene.add(snowSystem);
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0.75; bloomPass.strength = 1.6; bloomPass.radius = 0.5;
+        composer.addPass(bloomPass);
+
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else if (document.exitFullscreen) document.exitFullscreen();
+        });
+
+        const clock = new THREE.Clock();
+        const fixedCameraDistance = 65;
+        let previousViewState = 'TREE_SHAPE';
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            analyzeAudio();
+            updateVisualizer();
+
+            if (audioElement && !audioElement.paused && lyricsDataEn.length > 0) {
+                const currentTime = audioElement.currentTime;
+                let idx = lyricsDataEn.findIndex(line => line.time > currentTime);
+                if (idx === -1) idx = lyricsDataEn.length;
+                idx = idx - 1;
+
+                if (idx !== currentEnIndex && idx >= 0) {
+                    currentEnIndex = idx;
+                    const originalText = lyricsDataEn[idx].text;
+                    let transText = "";
+                    if (lyricsDataCn.length > 0) {
+                        const targetTime = lyricsDataEn[idx].time;
+                        const cnLine = lyricsDataCn.reduce((prev, curr) => {
+                            return (Math.abs(curr.time - targetTime) < Math.abs(prev.time - targetTime) ? curr : prev);
+                        });
+                        if (Math.abs(cnLine.time - targetTime) < 2.0) {
+                            transText = cnLine.text;
+                        }
+                    }
+                    lyricElement.classList.remove('active');
+                    setTimeout(() => {
+                        lyricElement.querySelector('.original').textContent = originalText;
+                        lyricElement.querySelector('.translation').textContent = transText;
+                        lyricElement.classList.add('active');
+                    }, 300);
+                }
+            }
+
+            const isTree = viewState === 'TREE_SHAPE';
+            const isHeart = viewState === 'HEART_SHAPE';
+            const isScattered = viewState === 'SCATTERED';
+            const shouldShowHeartUI = isHeart || (isScattered && lastGatheredShape === 'HEART');
+            const isTreeScattered = isScattered && lastGatheredShape === 'TREE';
+            const isHeartScattered = isScattered && lastGatheredShape === 'HEART';
+
+            if (viewState !== previousViewState) {
+                if (viewState === 'HEART_SHAPE') {
+                    applyBrightness(2);
+                    heartBrightnessBtn.disabled = true;
+                    heartBrightnessBtn.style.opacity = '0.5';
+                    heartBrightnessBtn.style.cursor = 'default';
+                } else if (previousViewState === 'HEART_SHAPE' && viewState === 'SCATTERED') {
+                    applyBrightness(1);
+                    heartBrightnessBtn.disabled = false;
+                    heartBrightnessBtn.style.opacity = '1';
+                    heartBrightnessBtn.style.cursor = 'pointer';
+                } else {
+                    heartBrightnessBtn.disabled = false;
+                    heartBrightnessBtn.style.opacity = '1';
+                    heartBrightnessBtn.style.cursor = 'pointer';
+                }
+                previousViewState = viewState;
+            }
+
+            updateUIStyle(shouldShowHeartUI);
+            updateParticleColors(shouldShowHeartUI);
+            if (shouldShowHeartUI) {
+                audioPanel.classList.add('heart-mode');
+                lightPanel.classList.add('heart-mode');
+                visualPanel.classList.add('heart-mode');
+            } else {
+                audioPanel.classList.remove('heart-mode');
+                lightPanel.classList.remove('heart-mode');
+                visualPanel.classList.remove('heart-mode');
+            }
+
+            const showSmallHearts = isHeart || isHeartScattered;
+            meshRefs.smallHeart.visible = showSmallHearts;
+
+            Object.entries(meshRefs).forEach(([key, mesh]) => {
+                if (key !== 'smallHeart') mesh.visible = !showSmallHearts;
+            });
+            ribbonMesh.visible = isTree;
+
+            if (handData.isActive) {
+                controls.autoRotate = false;
+                const spherical = new THREE.Spherical().setFromVector3(camera.position);
+                spherical.theta -= (handData.x - 0.5) * 0.03;
+                spherical.phi = Math.max(0.3, Math.min(Math.PI / 2 - 0.1, spherical.phi + (handData.y - 0.5) * 0.015));
+                spherical.radius = cameraSettings.distance;
+                camera.position.setFromSpherical(spherical);
+                camera.lookAt(0, 6, 0);
+                controls.target.set(0, 6, 0);
+            }
+            else {
+                const currentDist = camera.position.distanceTo(controls.target);
+                if (Math.abs(currentDist - cameraSettings.distance) > 0.5) {
+                    cameraSettings.distance = currentDist;
+                    cameraDistSlider.value = Math.round(currentDist);
+                    cameraDistValue.textContent = Math.round(currentDist);
+                }
+
+                if (cameraSettings.autoRotateSpeed > 0) {
+                    controls.autoRotate = true;
+                    controls.autoRotateSpeed = cameraSettings.autoRotateSpeed;
+                } else {
+                    controls.autoRotate = false;
+                }
+                controls.minDistance = 30;
+                controls.maxDistance = 150;
+                controls.update();
+            }
+
+            frameParticles.forEach((fp, idx) => {
+                if (idx >= activePhotoCount) {
+                    fp.mesh.visible = false;
+                    frameGlowMeshes[idx].visible = false;
+                    return;
+                }
+
+                const mesh = fp.mesh;
+                const glowMesh = frameGlowMeshes[idx];
+                let target;
+                let shouldShow = true;
+                let showGlow = false;
+
+                if (isHeart) {
+                    shouldShow = false;
+                    showGlow = false;
+                } else if (isHeartScattered) {
+                    target = fp.heartScatterPos;
+                    shouldShow = true;
+                    showGlow = true;
+                } else if (isTree) {
+                    target = fp.treePos;
+                    shouldShow = true;
+                    showGlow = false;
+                } else {
+                    target = fp.scatterPos;
+                    shouldShow = true;
+                    showGlow = false;
+                }
+
+                mesh.visible = shouldShow;
+                glowMesh.visible = showGlow;
+
+                if (!shouldShow) return;
+
+                const floatAmount = isHeartScattered ? 1.2 : (isTree ? 0.3 : 0.5);
+                const fx = Math.sin(time * 0.8 + fp.floatOffset) * floatAmount;
+                const fy = Math.cos(time * 0.6 + fp.floatOffset) * floatAmount * 0.8;
+                const fz = Math.sin(time * 0.5 + fp.floatOffset * 1.5) * floatAmount * 0.5;
+
+                fp.currentPos.x += (target.x + fx - fp.currentPos.x) * fp.weight;
+                fp.currentPos.y += (target.y + fy - fp.currentPos.y) * fp.weight;
+                fp.currentPos.z += (target.z + fz - fp.currentPos.z) * fp.weight;
+
+                mesh.position.copy(fp.currentPos);
+                mesh.scale.setScalar(fp.baseScale * audioData.heartBeatScale);
+
+                glowMesh.position.copy(fp.currentPos);
+                glowMesh.scale.setScalar(fp.baseScale * audioData.heartBeatScale);
+
+                if (isTree) {
+                    const swingAngle = Math.sin(time * 1.5 + fp.swingPhase) * 0.08;
+                    mesh.lookAt(0, fp.currentPos.y, 0);
+                    mesh.rotateY(Math.PI);
+                    mesh.rotateZ(swingAngle);
+                    glowMesh.quaternion.copy(mesh.quaternion);
+                } else if (isHeartScattered) {
+                    fp.rotation.x += fp.spinSpeed.x * 0.5;
+                    fp.rotation.y += fp.spinSpeed.y * 0.5;
+                    mesh.rotation.set(
+                        fp.rotation.x + Math.sin(time + idx) * 0.1,
+                        fp.rotation.y,
+                        Math.sin(time * 0.7 + fp.floatOffset) * 0.15
+                    );
+                    glowMesh.rotation.copy(mesh.rotation);
+                } else if (isTreeScattered) {
+                    fp.rotation.x += fp.spinSpeed.x * 0.33;
+                    fp.rotation.y += fp.spinSpeed.y * 0.33;
+                    mesh.rotation.copy(fp.rotation);
+                    glowMesh.rotation.copy(mesh.rotation);
+                } else {
+                    mesh.quaternion.copy(fp.randomStaticQuaternion);
+                    glowMesh.quaternion.copy(mesh.quaternion);
+                }
+            });
+
+            if (shouldShowHeartUI) {
+                const heartIntensity = 500 + audioData.heartBeatScale * 200;
+                heartLight.intensity = THREE.MathUtils.lerp(heartLight.intensity, heartIntensity, 0.1);
+                headLight.color.lerp(new THREE.Color(0xFFB6C1), 0.05);
+            } else {
+                heartLight.intensity = THREE.MathUtils.lerp(heartLight.intensity, 0, 0.05);
+                headLight.color.lerp(new THREE.Color(0xFFF8E7), 0.05);
+            }
+
+            for (let i = 0; i < TOTAL_VISUAL_PARTICLES; i++) {
+                const p = particles[i];
+                let target;
+                if (isHeart) target = p.heartPos;
+                else if (isHeartScattered) target = p.scatterPos.clone().multiplyScalar(audioData.heartBeatScale * 0.8);
+                else if (isTree) target = p.originalTreePos;
+                else target = p.scatterPos.clone().multiplyScalar(audioData.heartBeatScale);
+
+                if (isScattered && p.type !== 'needle') {
+                    const spinMultiplier = isTreeScattered ? 0.33 : 1.0;
+                    dummy.rotation.x += p.spinSpeed.x * spinMultiplier;
+                    dummy.rotation.y += p.spinSpeed.y * spinMultiplier;
+                }
+
+                if (isTree && !p.isGroundItem && (p.type === 'ball' || p.type === 'gift' || p.type === 'sock')) {
+                    dummy.rotation.copy(p.rotation);
+                    if (p.type === 'ball') {
+                        dummy.rotation.y += Math.sin(time + p.index) * 0.01;
+                    } else if (p.type === 'gift') {
+                        dummy.rotation.y += Math.cos(time * 0.5 + p.index) * 0.005;
+                    }
+                } else if (isTree && p.type === 'needle') {
+                    dummy.rotation.copy(p.needleRandomRot);
+                    dummy.lookAt(0, p.currentPos.y, 0);
+                    dummy.rotateX(-Math.PI / 2);
+                    dummy.rotateZ(p.needleRandomRot.z);
+                    dummy.scale.setScalar(1);
+                }
+                else if (isTree && p.type === 'light') { dummy.rotation.copy(p.rotation); dummy.scale.setScalar(1 + audioData.treble * 0.3); }
+                else if (isTree && p.type === 'cane') { dummy.lookAt(0, p.currentPos.y, 0); dummy.rotateX(Math.PI / 2); dummy.rotateZ(Math.PI); dummy.scale.setScalar(1); }
+                else {
+                    dummy.rotation.copy(p.rotation);
+                    dummy.scale.setScalar(p.baseScale);
+                }
+
+                if (isHeart) {
+                    dummy.lookAt(0, p.currentPos.y, 0);
+                    dummy.rotateZ(Math.sin(time * 0.8 + p.heartIndex * 0.01) * 0.2);
+                    dummy.scale.setScalar((1 + 0.1 * Math.sin(time * 2.2 + p.heartIndex * 0.02)) * 1.2);
+                } else if (isHeartScattered) {
+                    const am = 1 + audioData.treble * 0.5;
+                    p.heartCurrentRotation.x += p.heartRotationSpeed.x * am * 1.5;
+                    p.heartCurrentRotation.y += p.heartRotationSpeed.y * am * 1.5;
+                    p.heartCurrentRotation.z += p.heartRotationSpeed.z * am * 1.5;
+                    dummy.rotation.copy(p.heartCurrentRotation);
+                    dummy.scale.setScalar((1 + 0.15 * Math.sin(time * 1.5 + p.heartIndex * 0.02)) * 1.2 * audioData.heartBeatScale);
+                } else if (!isTree) {
+                    dummy.scale.setScalar((p.type === 'needle' ? 1 : 1.3) * audioData.heartBeatScale);
+                }
+
+                if (p.isGroundItem && isTree) {
+                    dummy.position.copy(p.originalTreePos);
+                    dummy.rotation.copy(p.rotation);
+                    dummy.scale.setScalar(p.baseScale);
+                    dummy.updateMatrix();
+                    p.mesh.setMatrixAt(p.index, dummy.matrix);
+                    continue;
+                }
+
+                const shouldFloat = isHeart || isHeartScattered;
+                const floatScale = shouldFloat ? 1.5 : (isTree ? 0 : 1);
+                const fx = (p.type !== 'needle') ? Math.sin(time + p.index) * 0.5 * floatScale : 0;
+                const fy = (p.type !== 'needle') ? Math.cos(time * 0.8 + p.index) * 0.5 * floatScale : 0;
+
+                const mw = shouldFloat ? p.weight * 0.7 : p.weight;
+                p.currentPos.x += (target.x + fx - p.currentPos.x) * mw;
+                p.currentPos.y += (target.y + fy - p.currentPos.y) * mw;
+                p.currentPos.z += (target.z - p.currentPos.z) * mw;
+                dummy.position.copy(p.currentPos);
+                dummy.updateMatrix();
+
+                if (showSmallHearts) meshRefs.smallHeart.setMatrixAt(p.heartIndex, dummy.matrix);
+                else p.mesh.setMatrixAt(p.index, dummy.matrix);
+            }
+
+            if (meshRefs.smallHeart.visible) meshRefs.smallHeart.instanceMatrix.needsUpdate = true;
+            if (!showSmallHearts) {
+                Object.entries(meshRefs).forEach(([key, mesh]) => {
+                    if (key !== 'smallHeart' && mesh.instanceMatrix) mesh.instanceMatrix.needsUpdate = true;
+                });
+            }
+
+            starMesh.rotation.y = time * (0.8 + audioData.beat * 0.5);
+            const auxScale = isTree ? 1 : (shouldShowHeartUI ? 0.6 : 0.01);
+            starMesh.scale.lerp(new THREE.Vector3(auxScale * audioData.heartBeatScale, auxScale * audioData.heartBeatScale, auxScale * audioData.heartBeatScale), 0.1);
+            if (shouldShowHeartUI) {
+                starMat.color.lerp(new THREE.Color(0xFF69B4), 0.05);
+                starMat.emissive.lerp(new THREE.Color(0xFF69B4), 0.05);
+                starMat.emissiveIntensity = 2.0 + audioData.bass * 2;
+            } else {
+                starMat.color.lerp(new THREE.Color(CONFIG.colors.gold), 0.05);
+                starMat.emissive.lerp(new THREE.Color(CONFIG.colors.gold), 0.05);
+                starMat.emissiveIntensity = 2.0 + audioData.overall * 1.5;
+            }
+
+            const positions = snowSystem.geometry.attributes.position.array;
+            for (let i = 0; i < CONFIG.counts.snow; i++) {
+                const d = snowData[i];
+                if (d.state === 1) {
+                    if (isScattered) {
+                        positions[i * 3 + 1] -= 0.3;
+                        if (positions[i * 3 + 1] < -30) { d.state = 0; positions[i * 3 + 1] = 60 + Math.random() * 20; }
+                    } else {
+                        positions[i * 3 + 1] = d.groundY;
+                        if (Math.random() < 0.002) { d.state = 0; positions[i * 3 + 1] = 60 + Math.random() * 20; }
+                    }
+                } else {
+                    positions[i * 3 + 1] -= snowVel[i];
+                    if ((isTree || isHeart) && positions[i * 3 + 1] <= d.groundY) { d.state = 1; positions[i * 3 + 1] = d.groundY; }
+                    else if (positions[i * 3 + 1] < -30) {
+                        positions[i * 3 + 1] = 60 + Math.random() * 20;
+                        positions[i * 3] = (Math.random() - 0.5) * 120;
+                        positions[i * 3 + 2] = (Math.random() - 0.5) * 120;
+                        const dist = Math.sqrt(positions[i * 3] ** 2 + positions[i * 3 + 2] ** 2);
+                        d.groundY = groundBaseY + Math.max(0, 4.5 * Math.exp(-(dist * dist) / 60)) + Math.random() * 0.5;
+                    }
+                }
+            }
+            snowSystem.geometry.attributes.position.needsUpdate = true;
+            if (shouldShowHeartUI) snowMat.color.lerp(new THREE.Color(0xFFB6C1), 0.05);
+            else snowMat.color.lerp(new THREE.Color(0xFFFFFF), 0.05);
+
+            composer.render();
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function togglePanel(panelId, btnId) {
+            const panel = document.getElementById(panelId);
+            const btn = document.getElementById(btnId);
+            const allPanels = document.querySelectorAll('.control-panel');
+            const allBtns = document.querySelectorAll('.sidebar-btn');
+
+            allPanels.forEach(p => {
+                if (p.id !== panelId) p.classList.remove('show');
+            });
+
+            const isShowing = panel.classList.toggle('show');
+
+            allBtns.forEach(b => b.style.background = 'transparent');
+            if (isShowing) {
+                const isHeart = viewState === 'HEART_SHAPE' || (viewState === 'SCATTERED' && lastGatheredShape === 'HEART');
+                btn.style.background = isHeart ? 'rgba(255, 105, 180, 0.2)' : 'rgba(255, 215, 0, 0.2)';
+            }
+        }
+
+        musicBtn.addEventListener('click', () => togglePanel('audio-panel', 'music-toggle-btn'));
+        lightBtn.addEventListener('click', () => togglePanel('light-panel', 'light-toggle-btn'));
+        visualBtn.addEventListener('click', () => togglePanel('visual-panel', 'visual-toggle-btn'));
+
+        updateLightPosition();
+        updateLightIntensity();
+    </script>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
